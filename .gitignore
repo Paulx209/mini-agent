@@ -36,3 +36,7 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+#yaml
+src/main/resources/secret-property.yaml
+
