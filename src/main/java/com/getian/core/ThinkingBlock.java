@@ -3,6 +3,7 @@ package com.getian.core;
 import lombok.Data;
 
 /**
+ * 用来承载 模型思考的 内容
  *@Author: sonicge
  *@CreateTime: 2026-07-05
  */

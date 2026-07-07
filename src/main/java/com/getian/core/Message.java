@@ -22,21 +22,22 @@ public class Message {
         this.content = content;
     }
 
-    public static Message user(ContentBlock content) {
-        return new Message("user", Collections.singletonList(content));
+    //user -> agent  TextBlock
+    public static Message user(String content) {
+        return new Message("user", Collections.singletonList(new TextBlock(content)));
     }
 
-    //tool_result 也属于 user
     public static Message user(List<ContentBlock> content) {
         return new Message("user", content);
     }
 
+    //toolResults  role -> user
     public static Message toolResults(List<ToolResultBlock> toolResultBlocks){
         return new Message("user",new ArrayList<>(toolResultBlocks));
     }
 
 
-    //tool_use 也属于 assistant
+    //将模型返回的内容 转换成下一轮发给模型的历史信息
     public static Message assistant(List<ContentBlock> content){
         return new Message("assistant",content);
     }

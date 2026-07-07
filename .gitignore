@@ -38,5 +38,8 @@ build/
 .DS_Store
 
 #yaml
-src/main/resources/secret-property.yaml
+src/main/resources/config.properties
+
+#docs
+docs
 

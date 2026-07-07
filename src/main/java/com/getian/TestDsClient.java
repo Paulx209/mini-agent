@@ -28,7 +28,7 @@ public class TestDsClient {
 
         String baseUrl = "https://api.deepseek.com/anthropic";
         String model = "deepseek-v4-flash";
-        String apiKey = "sk-64b3400ffa9944b7b15755e85c6d0b29";
+        String apiKey = "sk-64b3400ffa9944b7b15755e85c6d0b29"; //已经废弃
 
         JSONObject userPrompt = new JSONObject();
         userPrompt.put("role","user");

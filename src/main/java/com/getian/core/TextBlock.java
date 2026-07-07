@@ -3,6 +3,7 @@ package com.getian.core;
 import lombok.Data;
 
 /**
+ * 用来承载自然语言文本
  *@Author: sonicge
  *@CreateTime: 2026-07-05
  */

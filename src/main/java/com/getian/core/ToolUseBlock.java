@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 
 /**
+ * 用来承载 Tool Use 的内容
  *@Author: sonicge
  *@CreateTime: 2026-07-05
  */

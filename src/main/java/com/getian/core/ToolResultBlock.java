@@ -3,6 +3,7 @@ package com.getian.core;
 import lombok.Data;
 
 /**
+ * 用来承载 Tool Result 的类型
  *@Author: sonicge
  *@CreateTime: 2026-07-05
  */
