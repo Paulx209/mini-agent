@@ -45,7 +45,7 @@ public class BashTool implements Tool {
                 .fluentPut("type", "object")
                 .fluentPut("properties", properties)
                 .fluentPut("required", new JSONArray().fluentAdd("command"));
-        return new ToolDefinition(name, description, new JSONObject().fluentPut("input_schema", inputSchema));
+        return new ToolDefinition(name, description, inputSchema);
     }
 
     @Override
