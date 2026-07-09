@@ -3,6 +3,7 @@ package com.getian.core;
 import com.getian.llm.LLMClient;
 import com.getian.tool.Tool;
 import com.getian.tool.ToolDefinition;
+import com.getian.tool.ToolRegistry;
 import com.getian.tool.ToolResult;
 
 import java.util.ArrayList;
@@ -13,7 +14,7 @@ import java.util.Map;
 public class AgentLoop {
     private final LLMClient llmClient;
 
-    private final Map<String, Tool> tools = new LinkedHashMap<>();
+    private final ToolRegistry toolRegistry;
 
     private final AgentLoopListener listener;
 
@@ -23,11 +24,21 @@ public class AgentLoop {
     }
 
     public AgentLoop(LLMClient llmClient, List<Tool> tools, AgentLoopListener listener) {
-        this.llmClient = llmClient;
-        this.listener = listener;
-        for (Tool tool : tools) {
-            this.tools.put(tool.getDefinition().getName(), tool);
+        this(llmClient,toolRegistry(tools),listener);
+    }
+
+    public static ToolRegistry toolRegistry(List<Tool> tools){
+        ToolRegistry toolRegistry = new ToolRegistry();
+        for(Tool tool:tools){
+            toolRegistry.registry(tool);
         }
+        return toolRegistry;
+    }
+
+    public AgentLoop(LLMClient llmClient,ToolRegistry toolRegistry,AgentLoopListener listener){
+        this.llmClient = llmClient;
+        this.toolRegistry = toolRegistry;
+        this.listener = listener;
     }
 
     public AssistantMessage run(String prompt) {
@@ -77,7 +88,7 @@ public class AgentLoop {
     }
 
     private ToolResult executeTool(ToolUseBlock toolUseBlock) {
-        Tool tool = tools.get(toolUseBlock.getName());
+        Tool tool = toolRegistry.find(toolUseBlock.getName());
         if (tool == null) {
             return new ToolResult("Unknown tool :" + toolUseBlock.getName());
         }
@@ -86,11 +97,7 @@ public class AgentLoop {
 
 
     public List<ToolDefinition> toolDefinitions() {
-        List<ToolDefinition> definitions = new ArrayList<>();
-        for (Tool tool : tools.values()) {
-            definitions.add(tool.getDefinition());
-        }
-        return definitions;
+        return toolRegistry.definitions();
     }
 
 }
