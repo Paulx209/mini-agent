@@ -1,5 +1,8 @@
 package com.getian.core;
 
+import com.getian.hooks.HookContext;
+import com.getian.hooks.HookDecision;
+import com.getian.hooks.HookManager;
 import com.getian.llm.LLMClient;
 import com.getian.permission.PermissionDecision;
 import com.getian.permission.PermissionManager;
@@ -7,20 +10,27 @@ import com.getian.tool.Tool;
 import com.getian.tool.ToolDefinition;
 import com.getian.tool.ToolRegistry;
 import com.getian.tool.ToolResult;
+import com.getian.hooks.HookEvent;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
+
+import static com.getian.hooks.HookEvent.*;
+
 
 public class AgentLoop {
     private final LLMClient llmClient;
 
-    private final ToolRegistry toolRegistry;
-
     private final AgentLoopListener listener;
 
+    //s02新增
+    private final ToolRegistry toolRegistry;
+
+    //s03新增
     private final PermissionManager permissionManager;
+
+    //s04新增
+    private final HookManager hookManager;
 
     public AgentLoop(LLMClient llmClient, List<Tool> tools) {
         this(llmClient, tools, new AgentLoopListener() {
@@ -44,13 +54,16 @@ public class AgentLoop {
     }
 
     public AgentLoop(LLMClient llmClient, ToolRegistry toolRegistry, AgentLoopListener listener, PermissionManager permissionManager){
+        this(llmClient,toolRegistry,listener,permissionManager,null);
+    }
+
+    public AgentLoop(LLMClient llmClient, ToolRegistry toolRegistry, AgentLoopListener listener, PermissionManager permissionManager, HookManager manager){
         this.llmClient = llmClient;
         this.toolRegistry = toolRegistry;
         this.listener = listener;
         this.permissionManager = permissionManager;
-
+        this.hookManager = manager;
     }
-
     public AssistantMessage run(String prompt) {
         List<Message> messages = new ArrayList<>();
         messages.add(Message.user(prompt));
@@ -59,8 +72,9 @@ public class AgentLoop {
 
     public AssistantMessage run(List<Message> messages) {
         for (int turnIndex = 0; turnIndex < 20; turnIndex++) {
+            //userPromptSubmit hook 触发
             AssistantMessage response = llmClient.chat(messages, toolDefinitions());
-            //hooks-1 trigger
+
             listener.onAssistantMessage(response);
             messages.add(Message.assistant(response.getContent()));
 
@@ -117,5 +131,32 @@ public class AgentLoop {
     public List<ToolDefinition> toolDefinitions() {
         return toolRegistry.definitions();
     }
+
+    private  HookDecision triggerPreToolUseHooks(ToolUseBlock toolUseBlock){
+        if(hookManager == null){
+            return HookDecision.pass();
+        }
+        HookContext context = new HookContext(PRE_TOOL_USE);
+        context.setToolUseBlock(toolUseBlock);
+        return hookManager.trigger(PRE_TOOL_USE,context);
+    }
+
+    private void  triggerPostToolUseHooks(ToolResultBlock toolResultBlock){
+        if(hookManager == null){
+            return ;
+        }
+        HookContext context = new HookContext(POST_TOOL_USE);
+        context.setToolResultBlock(toolResultBlock);
+        hookManager.trigger(POST_TOOL_USE, context);
+    }
+
+    private void triggerStopHooks(List<Message> messages){
+        if(hookManager == null)return;
+        HookContext context = new HookContext(STOP);
+        context.setMessageList(messages);
+        hookManager.trigger(STOP,context);
+    }
+
+
 
 }
