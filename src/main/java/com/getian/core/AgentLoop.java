@@ -1,6 +1,8 @@
 package com.getian.core;
 
 import com.getian.llm.LLMClient;
+import com.getian.permission.PermissionDecision;
+import com.getian.permission.PermissionManager;
 import com.getian.tool.Tool;
 import com.getian.tool.ToolDefinition;
 import com.getian.tool.ToolRegistry;
@@ -17,6 +19,8 @@ public class AgentLoop {
     private final ToolRegistry toolRegistry;
 
     private final AgentLoopListener listener;
+
+    private final PermissionManager permissionManager;
 
     public AgentLoop(LLMClient llmClient, List<Tool> tools) {
         this(llmClient, tools, new AgentLoopListener() {
@@ -36,9 +40,15 @@ public class AgentLoop {
     }
 
     public AgentLoop(LLMClient llmClient,ToolRegistry toolRegistry,AgentLoopListener listener){
+        this(llmClient,toolRegistry,listener,null);
+    }
+
+    public AgentLoop(LLMClient llmClient, ToolRegistry toolRegistry, AgentLoopListener listener, PermissionManager permissionManager){
         this.llmClient = llmClient;
         this.toolRegistry = toolRegistry;
         this.listener = listener;
+        this.permissionManager = permissionManager;
+
     }
 
     public AssistantMessage run(String prompt) {
@@ -76,10 +86,18 @@ public class AgentLoop {
         for (ContentBlock block : response.getContent()) {
             if ("tool_use".equals(block.getType())) {
                 ToolUseBlock toolUseBlock = (ToolUseBlock) block;
-                //Hooks-2 trigger
                 listener.beforeToolUse(toolUseBlock);
+
+                //permission manager
+                PermissionDecision decision = permissionManager.check(toolUseBlock);
+                //被拒绝
+                if(!decision.isAllowed()){
+                    results.add(new ToolResultBlock(toolUseBlock.getId(),decision.getMessage()));
+                    continue;
+                }
+
                 ToolResult res = executeTool(toolUseBlock);
-                //Hooks-3 trigger
+
                 listener.afterToolUse(toolUseBlock, res);
                 results.add(new ToolResultBlock(toolUseBlock.getId(), res.getContent()));
             }

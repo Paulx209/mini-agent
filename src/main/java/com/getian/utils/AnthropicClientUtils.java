@@ -1,9 +1,17 @@
 package com.getian.utils;
 
+import com.getian.core.AgentLoop;
+import com.getian.core.AgentLoopListener;
+import com.getian.core.ToolUseBlock;
 import com.getian.llm.AnthropicConfig;
 import com.getian.llm.AnthropicLLMClient;
+import com.getian.permission.ConsoleApprovalPrompter;
+import com.getian.permission.PermissionManager;
+import com.getian.tool.*;
 
+import java.io.File;
 import java.util.Properties;
+import java.util.Scanner;
 
 public class AnthropicClientUtils {
     private static final String DEFAULT_CONFIG_RESOURCE = "config.properties";
@@ -34,6 +42,35 @@ public class AnthropicClientUtils {
         config.setSystemPrompt(systemPrompt);
         return new AnthropicLLMClient(config);
     }
+
+    public static AgentLoop createDefaultAgentLoop() {
+        AnthropicLLMClient client = createClient();
+        File workDir = new File(".");
+        ToolRegistry toolRegistry = new ToolRegistry()
+                .registry(new BashTool(workDir))
+                .registry(new GlobTool(workDir))
+                .registry(new EditFileTool(workDir))
+                .registry(new WriteFileTool(workDir))
+                .registry(new WriteFileTool(workDir));
+        PermissionManager manager = new PermissionManager(workDir,new ConsoleApprovalPrompter(new Scanner(System.in)));
+        return new AgentLoop(client, toolRegistry, new AgentLoopListener() {
+            @Override
+            public void beforeToolUse(ToolUseBlock toolUse) {
+                System.out.println("Tool> " + toolUse.getName() + " " + toolUse.getInput());
+            }
+
+            @Override
+            public void afterToolUse(ToolUseBlock toolUse, ToolResult result) {
+                System.out.println("ToolResult> " + preview(result.getContent()));
+            }
+        },manager);
+    }
+
+    private static String preview(String content){
+        return content == null || content.length() < 500 ? content : content.substring(0,500) + "\n... (" + (content.length()-500) + " more chars";
+    }
+
+
 
     private static String required(Properties properties, String key) {
         String value = properties.getProperty(key);
