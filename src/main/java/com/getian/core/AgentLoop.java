@@ -102,9 +102,8 @@ public class AgentLoop {
                 ToolUseBlock toolUseBlock = (ToolUseBlock) block;
                 listener.beforeToolUse(toolUseBlock);
 
-                //permission manager
-                PermissionDecision decision = permissionManager.check(toolUseBlock);
-                //被拒绝
+                //2.permission manager
+                PermissionDecision decision = checkPermission(toolUseBlock);
                 if(!decision.isAllowed()){
                     results.add(new ToolResultBlock(toolUseBlock.getId(),decision.getMessage()));
                     continue;
@@ -117,6 +116,13 @@ public class AgentLoop {
             }
         }
         return results;
+    }
+
+    private PermissionDecision checkPermission(ToolUseBlock toolUseBlock){
+        if(permissionManager == null){
+            return PermissionDecision.allow();
+        }
+        return permissionManager.check(toolUseBlock);
     }
 
     private ToolResult executeTool(ToolUseBlock toolUseBlock) {
