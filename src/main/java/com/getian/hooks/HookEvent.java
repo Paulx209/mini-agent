@@ -11,4 +11,11 @@ public class HookEvent {
     public static final String POST_TOOL_USE = "PostToolUse"; //工具使用后触发
     public static final String STOP = "Stop"; // Agent 循环停止时
     private HookEvent(){};
+
+    public static boolean  isValidEvent(String event){
+        return USER_PROMPT_SUBMIT.equals(event)
+                || PRE_TOOL_USE.equals(event)
+                || POST_TOOL_USE.equals(event)
+                || STOP.equals(event);
+    }
 }

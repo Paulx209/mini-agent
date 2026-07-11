@@ -12,7 +12,7 @@ public class S03PermissionDemo {
     private static File workDir = new File(".");
 
     public static void main(String[] args) {
-        AgentLoop agentLoop = AnthropicClientUtils.createDefaultAgentLoop();
+        AgentLoop agentLoop = AnthropicClientUtils.createSimpleAgentLoop();
         System.out.println("s03: Permission");
         System.out.println("输入问题，回车发送。输入 q 退出。\n");
 

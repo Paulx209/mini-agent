@@ -10,13 +10,14 @@ import com.getian.tool.Tool;
 import com.getian.tool.ToolDefinition;
 import com.getian.tool.ToolRegistry;
 import com.getian.tool.ToolResult;
+import lombok.Data;
 
 import java.util.ArrayList;
 import java.util.List;
 
 import static com.getian.hooks.HookEvent.*;
 
-
+@Data
 public class AgentLoop {
     private final LLMClient llmClient;
 
