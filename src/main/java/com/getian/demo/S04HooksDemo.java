@@ -1,6 +1,10 @@
 package com.getian.demo;
 
 import com.getian.core.*;
+import com.getian.hooks.HookContext;
+import com.getian.hooks.HookDecision;
+import com.getian.hooks.HookEvent;
+import com.getian.hooks.HookManager;
 import com.getian.utils.AnthropicClientUtils;
 
 import java.util.ArrayList;
@@ -29,6 +33,9 @@ public class S04HooksDemo {
                 break;
             }
 
+            //userPromptSubmit trigger
+            triggerUserPromptSubmitHook(simpleAgentLoop.getHookManager(),prompt);
+
             Message user = Message.user(prompt);
             history.add(user);
             AssistantMessage resp = simpleAgentLoop.run(history);
@@ -39,5 +46,14 @@ public class S04HooksDemo {
             }
             System.out.println();
         }
+    }
+
+    private static HookDecision triggerUserPromptSubmitHook(HookManager hookManager,String userPrompt){
+        if(hookManager == null){
+            return HookDecision.pass();
+        }
+        HookContext hookContext = new HookContext(HookEvent.USER_PROMPT_SUBMIT);
+        hookContext.setUserPrompt(userPrompt);
+        return hookManager.trigger(HookEvent.USER_PROMPT_SUBMIT,hookContext);
     }
 }
