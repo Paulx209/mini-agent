@@ -10,7 +10,6 @@ import com.getian.tool.Tool;
 import com.getian.tool.ToolDefinition;
 import com.getian.tool.ToolRegistry;
 import com.getian.tool.ToolResult;
-import com.getian.hooks.HookEvent;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -126,7 +125,7 @@ public class AgentLoop {
                 listener.afterToolUse(toolUseBlock, res);
 
                 //6.postToolUseHook trigger
-                triggerPostToolUseHooks(toolResultBlock);
+                triggerPostToolUseHooks(toolUseBlock,res);
 
                 results.add(toolResultBlock);
             }
@@ -163,12 +162,13 @@ public class AgentLoop {
         return hookManager.trigger(PRE_TOOL_USE,context);
     }
 
-    private void  triggerPostToolUseHooks(ToolResultBlock toolResultBlock){
+    private void  triggerPostToolUseHooks(ToolUseBlock toolUseBlock,ToolResult toolResult){
         if(hookManager == null){
             return ;
         }
         HookContext context = new HookContext(POST_TOOL_USE);
-        context.setToolResultBlock(toolResultBlock);
+        context.setToolResult(toolResult);
+        context.setToolUseBlock(toolUseBlock);
         hookManager.trigger(POST_TOOL_USE, context);
     }
 

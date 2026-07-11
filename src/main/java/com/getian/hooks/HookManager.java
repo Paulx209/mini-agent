@@ -14,6 +14,7 @@ public class HookManager {
     private final Map<String, List<Hook>> hooks = new LinkedHashMap<>();
 
     public HookManager register(String event, Hook hook) {
+//        boolean validEvent = HookEvent.isValidEvent(event);
         //如果key存在，返回value；key不存在，执行对应的func
         hooks.computeIfAbsent(event, key -> new ArrayList<>()).add(hook);
         return this;

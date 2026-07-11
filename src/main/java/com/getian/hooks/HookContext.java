@@ -3,6 +3,7 @@ package com.getian.hooks;
 import com.getian.core.Message;
 import com.getian.core.ToolResultBlock;
 import com.getian.core.ToolUseBlock;
+import com.getian.tool.ToolResult;
 import lombok.Data;
 
 import java.util.List;
@@ -18,7 +19,7 @@ public class HookContext {
     private String userPrompt;
     private List<Message> messageList; //上下文
     private ToolUseBlock toolUseBlock;
-    private ToolResultBlock toolResultBlock;
+    private ToolResult toolResult;
 
     public HookContext(String event){
         this.event = event;
