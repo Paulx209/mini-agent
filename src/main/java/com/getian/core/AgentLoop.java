@@ -72,7 +72,6 @@ public class AgentLoop {
 
     public AssistantMessage run(List<Message> messages) {
         for (int turnIndex = 0; turnIndex < 20; turnIndex++) {
-            //userPromptSubmit hook 触发
             AssistantMessage response = llmClient.chat(messages, toolDefinitions());
 
             listener.onAssistantMessage(response);
@@ -81,6 +80,7 @@ public class AgentLoop {
             //调用工具函数
             List<ToolResultBlock> toolResultBlocks = executeToolUse(response);
             if (!"tool_use".equals(response.getStopReason()) || toolResultBlocks.isEmpty()) {
+                triggerStopHooks(messages);
                 listener.onStop(response);
                 return response;
             }
@@ -100,6 +100,8 @@ public class AgentLoop {
         for (ContentBlock block : response.getContent()) {
             if ("tool_use".equals(block.getType())) {
                 ToolUseBlock toolUseBlock = (ToolUseBlock) block;
+
+                //1.AgentLoopListener
                 listener.beforeToolUse(toolUseBlock);
 
                 //2.permission manager
@@ -109,10 +111,24 @@ public class AgentLoop {
                     continue;
                 }
 
-                ToolResult res = executeTool(toolUseBlock);
+                //3.preToolUseHook trigger
+                HookDecision hookDecision = triggerPreToolUseHooks(toolUseBlock);
+                if(hookDecision.isBlocked()){
+                    results.add(new ToolResultBlock(toolUseBlock.getId(),hookDecision.getMessage()));
+                    continue;
+                }
 
+                //4.execute
+                ToolResult res = executeTool(toolUseBlock);
+                ToolResultBlock toolResultBlock = new ToolResultBlock(toolUseBlock.getId(), res.getContent());
+
+                //5.AgentLoopListener
                 listener.afterToolUse(toolUseBlock, res);
-                results.add(new ToolResultBlock(toolUseBlock.getId(), res.getContent()));
+
+                //6.postToolUseHook trigger
+                triggerPostToolUseHooks(toolResultBlock);
+
+                results.add(toolResultBlock);
             }
         }
         return results;

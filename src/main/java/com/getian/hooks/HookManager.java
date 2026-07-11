@@ -21,7 +21,7 @@ public class HookManager {
 
     public HookDecision trigger(String event, HookContext hookContext) {
         List<Hook> hooks = this.hooks.get(event);
-        if (hooks.isEmpty()) {
+        if (hooks == null || hooks.isEmpty()) {
             return HookDecision.pass();
         }
         for (Hook hook : hooks) {
