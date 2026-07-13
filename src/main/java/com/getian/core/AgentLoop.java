@@ -32,6 +32,11 @@ public class AgentLoop {
     //s04新增
     private final HookManager hookManager;
 
+    //s06新增
+    private final int maxTurns;
+
+    private static int DEFAULT_MAX_TURNS = 20;
+
     public AgentLoop(LLMClient llmClient, List<Tool> tools) {
         this(llmClient, tools, new AgentLoopListener() {
         });
@@ -40,6 +45,7 @@ public class AgentLoop {
     public AgentLoop(LLMClient llmClient, List<Tool> tools, AgentLoopListener listener) {
         this(llmClient,toolRegistry(tools),listener);
     }
+
 
     public static ToolRegistry toolRegistry(List<Tool> tools){
         ToolRegistry toolRegistry = new ToolRegistry();
@@ -53,16 +59,25 @@ public class AgentLoop {
         this(llmClient,toolRegistry,listener,null);
     }
 
+    public AgentLoop(LLMClient llmClient,ToolRegistry toolRegistry,AgentLoopListener listener,int maxTurns){
+        this(llmClient,toolRegistry,listener,null,null,maxTurns);
+    }
+
     public AgentLoop(LLMClient llmClient, ToolRegistry toolRegistry, AgentLoopListener listener, PermissionManager permissionManager){
         this(llmClient,toolRegistry,listener,permissionManager,null);
     }
 
     public AgentLoop(LLMClient llmClient, ToolRegistry toolRegistry, AgentLoopListener listener, PermissionManager permissionManager, HookManager manager){
+        this(llmClient,toolRegistry,listener,permissionManager,manager,DEFAULT_MAX_TURNS);
+    }
+
+    public AgentLoop(LLMClient llmClient,ToolRegistry toolRegistry,AgentLoopListener listener,PermissionManager permissionManager,HookManager hookManager,int maxTurns){
         this.llmClient = llmClient;
         this.toolRegistry = toolRegistry;
         this.listener = listener;
         this.permissionManager = permissionManager;
-        this.hookManager = manager;
+        this.hookManager = hookManager;
+        this.maxTurns = maxTurns;
     }
     public AssistantMessage run(String prompt) {
         List<Message> messages = new ArrayList<>();
@@ -179,7 +194,4 @@ public class AgentLoop {
         context.setMessageList(messages);
         hookManager.trigger(STOP,context);
     }
-
-
-
 }
