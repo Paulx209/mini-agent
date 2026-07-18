@@ -55,7 +55,7 @@ public class MemorySelector {
         for (int i = 0; i < indices.size() && selected.size() < MAX_SELECTED; i++) {
             Integer index = indices.getInteger(i);
             if (index != null && index >= 0 && index < memoryList.size()) {
-                selected.add(memoryList.get(i));
+                selected.add(memoryList.get(index));
             }
         }
         return selected;
