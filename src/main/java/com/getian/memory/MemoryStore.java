@@ -100,6 +100,22 @@ public class MemoryStore {
         }
     }
 
+    public void deleteMemoryFiles(){
+        ensureMemoryDir();
+        File[] files = memoryDir.listFiles(file -> file.isFile()
+                && file.getName().endsWith("md")
+                && !"MEMORY.md".equals(file.getName()));
+        if(files == null || files.length == 0){
+            return ;
+        }
+        for(File file : files){
+            if (!file.delete()) {
+                throw new IllegalStateException("Failed to delete memory: " + file);
+            }
+        }
+        rebuildIndex();
+    }
+
     public String indexContent(){
         File memoryIndex = new File(memoryDir,"MEMORY.md");
         if(!memoryIndex.exists() || !memoryIndex.isFile()){

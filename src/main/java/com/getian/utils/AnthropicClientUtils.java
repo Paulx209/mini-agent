@@ -47,6 +47,16 @@ public class AnthropicClientUtils {
         return new AnthropicLLMClient(config);
     }
 
+    public static AnthropicConfig defaultAnthropicConfig(String systemPrompt){
+        Properties properties = ConfigUtils.loadPropertiesFromResource(DEFAULT_CONFIG_RESOURCE);
+        AnthropicConfig config = new AnthropicConfig();
+        config.setModel(required(properties, MODEL_KEY));
+        config.setApiKey(required(properties, API_KEY));
+        config.setBaseUrl(required(properties, BASE_URL_KEY));
+        config.setSystemPrompt(systemPrompt);
+        return config;
+    }
+
     public static ToolRegistry createSimpleToolRegistry(File workDir) {
         return new ToolRegistry()
                 .registry(new BashTool(workDir))
