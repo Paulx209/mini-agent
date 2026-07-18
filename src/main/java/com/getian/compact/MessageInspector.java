@@ -73,8 +73,6 @@ public class MessageInspector {
         for (ContentBlock block : message.getContent()) {
             if (block != null && sb.length() > 0) {
                 sb.append("\n");
-            }else{
-                continue;
             }
             if (block instanceof TextBlock) {
                 sb.append(((TextBlock) block).getText());
