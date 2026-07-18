@@ -84,15 +84,13 @@ public class MemorySelector {
     private String catalog(List<Memory> memoryList) {
         StringBuilder builder = new StringBuilder();
         for (int i = 0; i < memoryList.size(); i++) {
-            if (builder.length() > 0) {
-                builder.append("\n");
-            }
             Memory memory = memoryList.get(i);
             builder.append(i)
                     .append(": ")
                     .append(memory.getName())
                     .append("- ")
-                    .append(memory.getDescription());
+                    .append(memory.getDescription())
+                    .append("\n");
         }
         return builder.toString();
     }
