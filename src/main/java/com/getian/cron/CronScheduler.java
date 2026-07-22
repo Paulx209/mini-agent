@@ -5,23 +5,27 @@ import cn.hutool.cron.pattern.CronPattern;
 import cn.hutool.cron.task.Task;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.function.Consumer;
 
 /**
  *@Author: sonicge
  *@CreateTime: 2026-07-21
+ * cron job 管理类
+ * 1.创建cron job
  */
 
 public class CronScheduler {
     private final CronStore cronStore;
+    private final Consumer<CronJob> onFire;
     private final Map<String, CronJob> jobs = new ConcurrentHashMap<>();
 
-    public CronScheduler(CronStore store) {
+    public CronScheduler(CronStore store, Consumer<CronJob> onFire) {
         this.cronStore = store;
+        this.onFire = onFire;
     }
 
     /**
@@ -85,20 +89,20 @@ public class CronScheduler {
         return "Scheduled " + id + ": '" + cron + "' → " + prompt;
     }
 
-    public String cancel(String jobId){
-        if(!jobs.containsKey(jobId)){
-            return "Job " + jobId +" is not found";
+    public String cancel(String jobId) {
+        if (!jobs.containsKey(jobId)) {
+            return "Job " + jobId + " is not found";
         }
         CronJob removed = jobs.remove(jobId);
         CronUtil.remove(jobId);
-        if(removed.isDurable()){
+        if (removed.isDurable()) {
             cronStore.save(new ArrayList<>(jobs.values()));
         }
         System.out.println("  [cron cancel] " + jobId);
         return "Cancelled " + jobId;
     }
 
-    public List<CronJob> list(){
+    public List<CronJob> list() {
         return new ArrayList<>(jobs.values());
     }
 
@@ -134,9 +138,22 @@ public class CronScheduler {
          */
         @Override
         public void execute() {
-            //todo
+            CronJob cronJob = jobs.get(id);
+            if (cronJob == null) {
+                return;
+            }
+            System.out.println("  [cron fire] " + id + " → "
+                    + (cronJob.getPrompt().length() > 40
+                    ? cronJob.getPrompt().substring(0, 40) : cronJob.getPrompt()));
+            try {
+                onFire.accept(cronJob);
+            } catch (Exception e) {
+                System.err.println("  [cron error] " + id + ": " + e.getMessage());
+            }
+            //一次性任务 执行完取消掉
+            if (!cronJob.isRecurring()) {
+                cancel(id);
+            }
         }
     }
-
-
 }
