@@ -21,7 +21,7 @@ public class BackgroundDecider {
     public static boolean isRunBackGround(String toolName, JSONObject inputSchema) {
         //第一层：从大模型返回的inputSchema中判断
         if (toolName != null && !toolName.isBlank() && !"bash".equals(toolName)){
-            return true;
+            return false;
         }
         if(inputSchema !=null && inputSchema.getBoolean("run_in_background") !=null && inputSchema.getBoolean("run_in_background")){
             return true;
