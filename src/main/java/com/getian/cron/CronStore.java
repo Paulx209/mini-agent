@@ -45,10 +45,12 @@ public class CronStore {
         try {
             String jsonString = Files.readString(file.toPath(), StandardCharsets.UTF_8);
             JSONArray array = JSON.parseArray(jsonString);
-            for (int i = 0; i < array.size(); i++) {
-                CronJob job = array.getObject(i, CronJob.class);
-                if (job.getId() != null && job.getCron() != null && job.getPrompt() != null){
-                    res.add(job);
+            if (array != null) {
+                for (int i = 0; i < array.size(); i++) {
+                    CronJob job = array.getObject(i, CronJob.class);
+                    if (job.getId() != null && job.getCron() != null && job.getPrompt() != null) {
+                        res.add(job);
+                    }
                 }
             }
         } catch (IOException e) {
