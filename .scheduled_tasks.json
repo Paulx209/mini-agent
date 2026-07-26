@@ -1,0 +1,16 @@
+[
+	{
+		"cron":"55 15 * * *",
+		"durable":true,
+		"id":"cron_ea2c761",
+		"prompt":"请创建一个任务，主题为\"记录 cron 调度、任务创建、任务完成是否正常\"，描述为\"检查并记录本次 cron 是否正常触发，任务是否能正常创建和完成。\"",
+		"recurring":false
+	},
+	{
+		"cron":"* * * * *",
+		"durable":true,
+		"id":"cron_de6addd",
+		"prompt":"请检查当前任务列表，找出所有 pending 状态的任务，并列出它们的 ID 和主题。",
+		"recurring":true
+	}
+]
