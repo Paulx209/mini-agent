@@ -44,7 +44,7 @@ public class CronScheduler {
             }
             jobs.put(job.getId(), job);
             //3.定时任务注册
-            CronUtil.schedule(job.getId(), job.getCron(), new CronTask(job.getId()));
+            CronUtil.schedule(job.getId(), job.getCron(), new CronTask(job));
             System.out.println("  [cron] loaded durable job " + job.getId()
                     + " '" + job.getCron() + "'");
         }
@@ -78,7 +78,8 @@ public class CronScheduler {
         );
         CronJob job = new CronJob(id, cron, prompt, recurring, durable);
         jobs.put(id, job);
-        CronUtil.schedule(id, cron, new CronTask(id));
+        //3.借助CronUtil 挂载定时任务
+        CronUtil.schedule(id, cron, new CronTask(job));
 
         if (durable) {
             cronStore.save(new ArrayList<>(jobs.values()));
@@ -127,10 +128,10 @@ public class CronScheduler {
     }
 
     private class CronTask implements Task {
-        private String id;
+        private final CronJob cronJob;
 
-        public CronTask(String id) {
-            this.id = id;
+        public CronTask(CronJob cronJob) {
+            this.cronJob = cronJob;
         }
 
         /**
@@ -138,21 +139,22 @@ public class CronScheduler {
          */
         @Override
         public void execute() {
-            CronJob cronJob = jobs.get(id);
-            if (cronJob == null) {
+            //判断该cronJob是否还存在
+            if (cronJob != null && !jobs.containsKey(cronJob.getId())) {
                 return;
             }
-            System.out.println("  [cron fire] " + id + " → "
+
+            System.out.println("  [cron fire] " + cronJob.getId() + " → "
                     + (cronJob.getPrompt().length() > 40
                     ? cronJob.getPrompt().substring(0, 40) : cronJob.getPrompt()));
             try {
                 onFire.accept(cronJob);
             } catch (Exception e) {
-                System.err.println("  [cron error] " + id + ": " + e.getMessage());
+                System.err.println("  [cron error] " + cronJob.getId() + ": " + e.getMessage());
             }
             //一次性任务 执行完取消掉
             if (!cronJob.isRecurring()) {
-                cancel(id);
+                cancel(cronJob.getId());
             }
         }
     }
