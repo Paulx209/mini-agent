@@ -68,6 +68,7 @@ public class CronScheduler {
      * 注册一个新的 cron 任务
      */
     public String schedule(String cron, String prompt, boolean recurring, boolean durable) {
+        //1.校验cron表达式的正确性
         String res = validateCron(cron);
         if (res != null) {
             return "Error: " + res;
@@ -76,11 +77,13 @@ public class CronScheduler {
         String id = "cron_" + Integer.toHexString(
                 ThreadLocalRandom.current().nextInt(0x10000, 0x10000000)
         );
+        //2.创建cronJob并存储在jobs
         CronJob job = new CronJob(id, cron, prompt, recurring, durable);
         jobs.put(id, job);
         //3.借助CronUtil 挂载定时任务
         CronUtil.schedule(id, cron, new CronTask(job));
 
+        //4.持久化 -> 同步到文件
         if (durable) {
             cronStore.save(new ArrayList<>(jobs.values()));
         }
@@ -96,6 +99,7 @@ public class CronScheduler {
         }
         CronJob removed = jobs.remove(jobId);
         CronUtil.remove(jobId);
+        //删除需要持久化的job 需要重新写文件
         if (removed.isDurable()) {
             cronStore.save(new ArrayList<>(jobs.values()));
         }
