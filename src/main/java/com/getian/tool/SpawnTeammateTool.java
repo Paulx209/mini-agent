@@ -1,0 +1,209 @@
+package com.getian.tool;
+
+import com.alibaba.fastjson.JSONArray;
+import com.alibaba.fastjson.JSONObject;
+import com.getian.core.*;
+import com.getian.llm.AnthropicConfig;
+import com.getian.llm.AnthropicLLMClient;
+import com.getian.llm.LLMClient;
+import com.getian.team.MessageBus;
+import com.getian.team.TeamMessage;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ *@Author: sonicge
+ *@CreateTime: 2026-07-27
+ */
+
+public class SpawnTeammateTool implements  Tool{
+    private static final int MAX_TEAMMATE_TURNS = 10;
+    private final File workdir;
+    private final MessageBus messageBus;
+    private final String model;
+    private final String baseUrl;
+    private final String apiKey;
+    private final String promptTemplate;
+    private final Set<String> activeTeammates = ConcurrentHashMap.newKeySet();
+    public SpawnTeammateTool(File workdir, MessageBus messageBus, String baseUrl, String apiKey, String model, String promptTemplate) {
+        this.workdir = workdir;
+        this.messageBus = messageBus;
+        this.baseUrl = baseUrl;
+        this.apiKey = apiKey;
+        this.model = model;
+        this.promptTemplate = promptTemplate;
+    }
+
+    /**
+     * {
+     *   "name": "spawn_teammate",
+     *   "description": "Spawn a teammate agent in a background thread.",
+     *   "input_schema": {
+     *     "type": "object",
+     *     "properties": {
+     *       "name": {"type": "string"},
+     *       "role": {"type": "string"},
+     *       "prompt": {"type": "string"}
+     *     },
+     *     "required": ["name", "role", "prompt"]
+     *   }
+     * }
+     */
+    @Override
+    public ToolDefinition getDefinition() {
+        JSONObject properties = new JSONObject()
+                .fluentPut("name", new JSONObject().fluentPut("type", "string"))
+                .fluentPut("role", new JSONObject().fluentPut("type", "string"))
+                .fluentPut("prompt", new JSONObject().fluentPut("type", "string"));
+        JSONObject schema = new JSONObject()
+                .fluentPut("type", "object")
+                .fluentPut("properties", properties)
+                .fluentPut("required", new JSONArray()
+                        .fluentAdd("name").fluentAdd("role").fluentAdd("prompt"));
+        return new ToolDefinition("spawn_teammate",
+                "Spawn a teammate agent in a background thread.", schema);
+    }
+
+    @Override
+    public ToolResult execute(JSONObject input) {
+        //1.解析参数
+        String name = input != null ? input.getString("name") : "";
+        String agentRole = input != null ? input.getString("role") : "";
+        String agentPrompt = input != null ? input.getString("prompt") : "";
+        if (name == null || name.isBlank()) {
+            return new ToolResult("Error : name is required");
+        }
+        if (agentRole == null || agentRole.isBlank()) {
+            return new ToolResult("Error : role is required");
+        }
+        if (agentPrompt == null || agentPrompt.isBlank()) {
+            return new ToolResult("Error : prompt is required");
+        }
+
+        //2.同步subagent name 到set集合中
+        String agentName = name.trim();
+        if(!activeTeammates.add(agentName)){
+            return new ToolResult("Teammate '" + agentName + "' already exists");
+        }
+
+        //3.创建subAgentLoop
+        Thread thread = new Thread(() -> {
+            try {
+                runTeammate(agentName, agentRole, agentPrompt);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+
+        thread.setDaemon(true);
+        thread.start();
+        System.out.println("  [teammate] " + agentName + " spawned as " + agentRole.trim());
+        return new ToolResult("Teammate '" + agentName + "' spawned as " + agentRole.trim());
+    }
+
+    private void runTeammate(String agentName,String agentRole,String agentPrompt) throws Exception {
+        try {
+            ToolRegistry registry = new ToolRegistry()
+                    .registry(new BashTool(workdir))
+                    .registry(new WriteFileTool(workdir))
+                    .registry(new ReadFileTool(workdir))
+                    .registry(new SendMessageTool(messageBus, agentName));
+            AnthropicLLMClient client = new AnthropicLLMClient(config(String.format(promptTemplate, agentName, agentRole, workdir.getAbsolutePath())));
+            AssistantMessage resp = runTeammateLoop(agentName, agentPrompt, client, registry);
+            String summary = extractText(resp);
+            if (summary.isBlank()) {
+                summary = "Done.";
+            }
+            messageBus.send(agentName, "lead", summary, "result");
+            System.out.println("  [teammate] " + agentName + " finished");
+        } catch (Exception e) {
+            messageBus.send(agentName, "lead", "Error: " + e.getMessage(), "result");
+        } finally {
+            //处理完毕之后 remove掉
+            activeTeammates.remove(agentName);
+        }
+    }
+
+    private AssistantMessage runTeammateLoop(String name, String prompt, LLMClient llmClient, ToolRegistry registry) {
+        List<Message> history = new ArrayList<>();
+        history.add(Message.user(prompt));
+        AssistantMessage lastResponse = null;
+        for (int i = 0; i < MAX_TEAMMATE_TURNS; i++) {
+            //注入其他agent给该agent发送的message
+            injectTeammateLoop(name, history);
+
+            AssistantMessage resp = llmClient.chat(history, registry.definitions());
+            lastResponse = resp;
+            history.add(Message.assistant(resp.getContent()));
+            List<ToolResultBlock> resultBlocks = executeToolUses(resp, registry);
+            if (!"tool_use".equals(resp.getStopReason()) || resultBlocks.isEmpty()) {
+                return resp;
+            }
+            history.add(Message.toolResults(resultBlocks));
+        }
+        return lastResponse;
+    }
+
+    private String extractText(AssistantMessage resp) {
+        if (resp == null || resp.getContent().isEmpty()) {
+            return "";
+        }
+        List<ContentBlock> content = resp.getContent();
+        StringBuilder builder = new StringBuilder();
+        for (ContentBlock block : content) {
+            if (block instanceof TextBlock) {
+                builder.append(((TextBlock) block).getText()).append("\n");
+            }
+        }
+        return builder.toString();
+    }
+
+
+    private void injectTeammateLoop(String agentName, List<Message> messages) {
+        List<TeamMessage> inbox = messageBus.read(agentName);
+        if (inbox.isEmpty()) {
+            return;
+        }
+        System.out.println("  [teammate inbox] " + agentName + ": "
+                + inbox.size() + " message(s)");
+        messages.add(Message.user("<inbox>\n" + messageBus.formatInbox(inbox) + "\n</inbox>"));
+    }
+
+
+    private List<ToolResultBlock> executeToolUses(AssistantMessage resp, ToolRegistry registry) {
+        List<ToolResultBlock> res = new ArrayList<>();
+        if (resp == null || resp.getContent() == null) {
+            return res;
+        }
+        List<ContentBlock> contentBlocks = resp.getContent();
+        for (ContentBlock block : contentBlocks) {
+            if (block instanceof ToolUseBlock) {
+                ToolUseBlock toolUseBlock = (ToolUseBlock) block;
+                String name = ((ToolUseBlock) block).getName();
+                Tool tool = registry.find(name);
+                ToolResult result = tool == null
+                        ? new ToolResult("Unknown tool: " + toolUseBlock.getName())
+                        : tool.execute(toolUseBlock.getInput());
+                System.out.println("  [teammate tool] " + toolUseBlock.getName()
+                        + " -> " + preview(result.getContent()));
+                res.add(new ToolResultBlock(((ToolUseBlock) block).getId(), result.getContent()));
+            }
+        }
+        return res;
+    }
+
+    private AnthropicConfig config(String systemPrompt) {
+        return new AnthropicConfig(baseUrl, model, apiKey, systemPrompt);
+    }
+
+    private String preview(String content) {
+        if (content == null || content.length() <= 120) {
+            return content;
+        }
+        return content.substring(0, 120) + "...";
+    }
+}
