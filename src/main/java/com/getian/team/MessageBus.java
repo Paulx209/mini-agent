@@ -1,7 +1,9 @@
 package com.getian.team;
 
 import cn.hutool.core.io.FileUtil;
+import cn.hutool.core.util.ReUtil;
 import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONObject;
 
 import java.io.File;
 import java.io.IOException;
@@ -21,14 +23,19 @@ public class MessageBus {
         this.mailboxDir = new File(workDir,".mailboxes");
     }
     public synchronized void send(String from, String to, String content) throws Exception {
-        send(from, to, content, "message");
+        send(from,to,content,"message");
     }
+
     /**
      * 往mailBox中发送消息
      */
     public synchronized void send(String from, String to, String content, String type) throws Exception {
+        send(from,to,content,type,new JSONObject());
+    }
+
+    public synchronized void send(String from, String to, String content, String type,JSONObject metadata){
         try {
-            TeamMessage message = new TeamMessage(from, to, content, type, System.currentTimeMillis());
+            TeamMessage message = new TeamMessage(from, to, content, type, System.currentTimeMillis(),metadata);
             File file = mailboxFile(to);
             FileUtil.appendUtf8String(JSON.toJSONString(message) + "\n", file);
             System.out.println("  [bus] " + from + " -> " + to + ": " + preview(content));
@@ -70,8 +77,15 @@ public class MessageBus {
         StringBuilder builder = new StringBuilder();
         if(messages!=null){
             for (TeamMessage message : messages) {
+                JSONObject metadata = message.getMetadata();
+                String requestId = metadata == null ? "" :metadata.getString("request_id");
                 builder.append("From ").append(message.getFrom())
-                        .append(" [").append(message.getType()).append("]: ")
+                        .append(" [").append(message.getType());
+
+                if(requestId!=null || !requestId.isBlank()){
+                    builder.append(" req:").append(requestId);
+                }
+                builder.append("]: ")
                         .append(message.getContent())
                         .append("\n");
             }
