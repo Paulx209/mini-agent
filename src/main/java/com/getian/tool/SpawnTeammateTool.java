@@ -6,6 +6,7 @@ import com.getian.core.*;
 import com.getian.llm.AnthropicConfig;
 import com.getian.llm.AnthropicLLMClient;
 import com.getian.llm.LLMClient;
+import com.getian.protocol.ProtocolService;
 import com.getian.team.MessageBus;
 import com.getian.team.TeamMessage;
 
@@ -20,22 +21,32 @@ import java.util.concurrent.ConcurrentHashMap;
  *@CreateTime: 2026-07-27
  */
 
-public class SpawnTeammateTool implements  Tool{
+public class SpawnTeammateTool implements Tool {
     private static final int MAX_TEAMMATE_TURNS = 10;
+    private final int INBOX_NONE = 0;
+    private final int INBOX_CONTINUE =1;
+    private final int INBOX_SHUTDOWN = 2;
     private final File workdir;
     private final MessageBus messageBus;
     private final String model;
     private final String baseUrl;
     private final String apiKey;
     private final String promptTemplate;
+    private final ProtocolService service;
     private final Set<String> activeTeammates = ConcurrentHashMap.newKeySet();
+
     public SpawnTeammateTool(File workdir, MessageBus messageBus, String baseUrl, String apiKey, String model, String promptTemplate) {
+        this(workdir, messageBus, baseUrl, apiKey, model, promptTemplate, null);
+    }
+
+    public SpawnTeammateTool(File workdir, MessageBus messageBus, String baseUrl, String apiKey, String model, String promptTemplate, ProtocolService service) {
         this.workdir = workdir;
         this.messageBus = messageBus;
         this.baseUrl = baseUrl;
         this.apiKey = apiKey;
         this.model = model;
         this.promptTemplate = promptTemplate;
+        this.service = service;
     }
 
     /**
@@ -86,7 +97,7 @@ public class SpawnTeammateTool implements  Tool{
 
         //2.同步subagent name 到set集合中
         String agentName = name.trim();
-        if(!activeTeammates.add(agentName)){
+        if (!activeTeammates.add(agentName)) {
             return new ToolResult("Teammate '" + agentName + "' already exists");
         }
 
@@ -105,15 +116,20 @@ public class SpawnTeammateTool implements  Tool{
         return new ToolResult("Teammate '" + agentName + "' spawned as " + agentRole.trim());
     }
 
-    private void runTeammate(String agentName,String agentRole,String agentPrompt) throws Exception {
+    private void runTeammate(String agentName, String agentRole, String agentPrompt) throws Exception {
         try {
             ToolRegistry registry = new ToolRegistry()
                     .registry(new BashTool(workdir))
                     .registry(new WriteFileTool(workdir))
                     .registry(new ReadFileTool(workdir))
                     .registry(new SendMessageTool(messageBus, agentName));
+            if (service != null) {
+                registry.registry(new SubmitPlanTool(service, agentName));
+            }
             AnthropicLLMClient client = new AnthropicLLMClient(config(String.format(promptTemplate, agentName, agentRole, workdir.getAbsolutePath())));
-            AssistantMessage resp = runTeammateLoop(agentName, agentPrompt, client, registry);
+            //普通模式 or 协议模式
+            AssistantMessage resp = service == null ? runSimpleTurnLoop(agentName, agentName, client, registry)
+                    : runProtocolLoop(agentName, agentPrompt, client, registry);
             String summary = extractText(resp);
             if (summary.isBlank()) {
                 summary = "Done.";
@@ -128,7 +144,7 @@ public class SpawnTeammateTool implements  Tool{
         }
     }
 
-    private AssistantMessage runTeammateLoop(String name, String prompt, LLMClient llmClient, ToolRegistry registry) {
+    private AssistantMessage runSimpleTurnLoop(String name, String prompt, LLMClient llmClient, ToolRegistry registry) {
         List<Message> history = new ArrayList<>();
         history.add(Message.user(prompt));
         AssistantMessage lastResponse = null;
@@ -146,6 +162,40 @@ public class SpawnTeammateTool implements  Tool{
             history.add(Message.toolResults(resultBlocks));
         }
         return lastResponse;
+    }
+
+    private AssistantMessage runProtocolLoop(String name, String prompt, LLMClient client, ToolRegistry toolRegistry) {
+        List<Message> history = new ArrayList<>();
+        history.add(Message.user(prompt));
+        AssistantMessage lastResp = null;
+        for (int i = 0; i < MAX_TEAMMATE_TURNS; i++) {
+            //inject最新的mailBox
+            int shouldAction = injectTeammateLoop(name,history);
+            if( shouldAction == INBOX_SHUTDOWN){
+                return lastResp;
+            }
+            //chat
+            AssistantMessage resp = client.chat(history, toolRegistry.definitions());
+            lastResp = resp;
+            history.add(Message.assistant(resp.getContent()));
+
+            //execute tool
+            List<ToolResultBlock> blocks = executeToolUses(resp, toolRegistry);
+            if(!"tool_use".equals(resp.getStopReason()) || blocks.isEmpty()){
+                //不直接返回 而是睡眠 等待mailBox中的消息
+                int idleAction = idleUntilMessage(name, history);
+                if (idleAction == INBOX_SHUTDOWN) {
+                    return lastResp;
+                }
+                continue;
+            }
+            history.add(Message.toolResults(blocks));
+        }
+        return lastResp;
+    }
+
+    private int idleUntilMessage(String name, List<Message> history) {
+
     }
 
     private String extractText(AssistantMessage resp) {
