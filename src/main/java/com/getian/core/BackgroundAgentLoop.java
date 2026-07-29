@@ -1,6 +1,5 @@
 package com.getian.core;
 
-import com.alibaba.fastjson.JSONObject;
 import com.getian.background.BackgroundDecider;
 import com.getian.background.BackgroundTasks;
 import com.getian.llm.LLMClient;
@@ -75,8 +74,7 @@ public class BackgroundAgentLoop {
                 ToolUseBlock toolUseBlock = (ToolUseBlock) block;
                 listener.beforeToolUse(toolUseBlock);
                 String toolName = toolUseBlock.getName();
-                JSONObject input = toolUseBlock.getInput();
-                boolean runBackGround = BackgroundDecider.isRunBackGround(toolName, input);
+                boolean runBackGround = BackgroundDecider.isRunBackGround(toolName, toolUseBlock.getInput());
 
                 ToolResult toolResult;
                 if (runBackGround) {

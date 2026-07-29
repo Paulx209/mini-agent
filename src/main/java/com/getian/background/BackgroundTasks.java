@@ -1,7 +1,6 @@
 package com.getian.background;
 
 import com.alibaba.fastjson.JSONObject;
-import com.alibaba.fastjson.serializer.AdderSerializer;
 import com.getian.core.ToolUseBlock;
 import com.getian.tool.Tool;
 import com.getian.tool.ToolRegistry;
