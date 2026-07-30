@@ -81,7 +81,7 @@ public class MessageBus {
                 builder.append("From ").append(message.getFrom())
                         .append(" [").append(message.getType());
 
-                if(requestId!=null || !requestId.isBlank()){
+                if(requestId!=null && !requestId.isBlank()){
                     builder.append(" req:").append(requestId);
                 }
                 builder.append("]: ")
