@@ -1,6 +1,7 @@
 package com.getian.protocol;
 
 import com.alibaba.fastjson.JSONObject;
+import com.getian.core.Message;
 import com.getian.team.MessageBus;
 import com.getian.team.TeamMessage;
 
@@ -132,5 +133,32 @@ public class ProtocolService {
 
     private String requestId() {
         return String.format("req_%06d", sequence.incrementAndGet());
+    }
+
+    public boolean isProtocolMessage(TeamMessage message) {
+        String messageType = message.getType();
+        return "shutdown_request".equals(messageType) || "plan_approval_response".equals(messageType);
+    }
+
+    public boolean handleTeammateProtocolMessage(String name, TeamMessage message, List<Message> messages) {
+        String type = message.getType();
+        JSONObject metadata = message.getMetadata();
+        String requestId = metadata == null ? "" : metadata.getString("request_id");
+        if("shutdown_request".equals(type)){
+            JSONObject responseMeta = metadata(requestId);
+            responseMeta.fluentPut("approve",true);
+            bus.send(name,LEAD,"Shutting down gracefully.","shutdown_response",responseMeta);
+            System.out.println("  [protocol] " + name
+                    + " approved shutdown (" + requestId + ")");
+            return true;
+        }
+        if("plan_approval_response".equals(type)){
+            boolean approve = metadata != null && metadata.getBooleanValue("approve");
+            String text = approve
+                    ? "[Plan approved] Proceed with the task."
+                    : "[Plan rejected] Feedback: " + message.getContent();
+            messages.add(Message.user(text));
+        }
+        return false;
     }
 }

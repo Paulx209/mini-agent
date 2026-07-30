@@ -128,7 +128,7 @@ public class SpawnTeammateTool implements Tool {
             }
             AnthropicLLMClient client = new AnthropicLLMClient(config(String.format(promptTemplate, agentName, agentRole, workdir.getAbsolutePath())));
             //普通模式 or 协议模式
-            AssistantMessage resp = service == null ? runSimpleTurnLoop(agentName, agentName, client, registry)
+            AssistantMessage resp = service == null ? runSimpleTurnLoop(agentName, agentPrompt, client, registry)
                     : runProtocolLoop(agentName, agentPrompt, client, registry);
             String summary = extractText(resp);
             if (summary.isBlank()) {
@@ -150,7 +150,7 @@ public class SpawnTeammateTool implements Tool {
         AssistantMessage lastResponse = null;
         for (int i = 0; i < MAX_TEAMMATE_TURNS; i++) {
             //注入其他agent给该agent发送的message
-            injectTeammateLoop(name, history);
+            injectTeammateInbox(name, history);
 
             AssistantMessage resp = llmClient.chat(history, registry.definitions());
             lastResponse = resp;
@@ -170,7 +170,7 @@ public class SpawnTeammateTool implements Tool {
         AssistantMessage lastResp = null;
         for (int i = 0; i < MAX_TEAMMATE_TURNS; i++) {
             //inject最新的mailBox
-            int shouldAction = injectTeammateLoop(name,history);
+            int shouldAction = injectTeammateInbox(name,history);
             if( shouldAction == INBOX_SHUTDOWN){
                 return lastResp;
             }
@@ -194,8 +194,24 @@ public class SpawnTeammateTool implements Tool {
         return lastResp;
     }
 
-    private int idleUntilMessage(String name, List<Message> history) {
+    private int idleUntilMessage(String name, List<Message> messages) {
+        while (true) {
+            sleepOneSecond();
+            int inboxAction = injectTeammateInbox(name, messages);
+            if (inboxAction != INBOX_NONE) {
+                return inboxAction;
+            }
+        }
+    }
 
+    private void sleepOneSecond() {
+        try {
+            Thread.sleep(1000);
+        }
+        catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Teammate interrupted", e);
+        }
     }
 
     private String extractText(AssistantMessage resp) {
@@ -213,14 +229,31 @@ public class SpawnTeammateTool implements Tool {
     }
 
 
-    private void injectTeammateLoop(String agentName, List<Message> messages) {
-        List<TeamMessage> inbox = messageBus.read(agentName);
+    private int injectTeammateInbox(String name, List<Message> messages) {
+        List<TeamMessage> inbox = messageBus.read(name);
         if (inbox.isEmpty()) {
-            return;
+            return INBOX_NONE;
         }
-        System.out.println("  [teammate inbox] " + agentName + ": "
+        System.out.println("  [teammate inbox] " + name + ": "
                 + inbox.size() + " message(s)");
-        messages.add(Message.user("<inbox>\n" + messageBus.formatInbox(inbox) + "\n</inbox>"));
+
+        List<TeamMessage> normalMessages = new ArrayList<>();
+        for (TeamMessage message : inbox) {
+            if (service != null && service.isProtocolMessage(message)) {
+                boolean shouldStop = service.handleTeammateProtocolMessage(name, message, messages);
+                if (shouldStop) {
+                    return INBOX_SHUTDOWN;
+                }
+            } else {
+                normalMessages.add(message);
+            }
+        }
+        if (!normalMessages.isEmpty()) {
+            messages.add(Message.user("<inbox>\n"
+                    + messageBus.formatInbox(normalMessages) + "\n</inbox>"));
+            return INBOX_CONTINUE;
+        }
+        return INBOX_NONE;
     }
 
 
