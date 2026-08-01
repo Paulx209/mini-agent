@@ -1,0 +1,7 @@
+{
+	"blockedBy":[],
+	"description":"优化用户表索引，提升查询性能",
+	"id":"task_1785048967184_9258",
+	"status":"pending",
+	"subject":"数据库表结构优化"
+}

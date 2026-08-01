@@ -6,9 +6,14 @@ import com.getian.task.TaskService;
 
 public class ClaimTaskTool implements Tool {
     private final TaskService taskService;
+    private final String defaultOwnerName;
 
     public ClaimTaskTool(TaskService taskService) {
+        this(taskService,"");
+    }
+    public ClaimTaskTool(TaskService taskService,String defaultOwnerName){
         this.taskService = taskService;
+        this.defaultOwnerName = defaultOwnerName;
     }
     /*
      * {
@@ -43,6 +48,7 @@ public class ClaimTaskTool implements Tool {
         try {
             String taskId = input == null ? null : input.getString("task_id");
             String owner = input == null ? null : input.getString("owner");
+            owner = (defaultOwnerName == null || defaultOwnerName.isBlank() )  ? owner : defaultOwnerName;
             return new ToolResult(taskService.claimTask(taskId, owner));
         } catch (Exception e) {
             return new ToolResult("Error: " + e.getMessage());

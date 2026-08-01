@@ -7,6 +7,8 @@ import com.getian.llm.AnthropicConfig;
 import com.getian.llm.AnthropicLLMClient;
 import com.getian.llm.LLMClient;
 import com.getian.protocol.ProtocolService;
+import com.getian.task.TaskRecord;
+import com.getian.task.TaskService;
 import com.getian.team.MessageBus;
 import com.getian.team.TeamMessage;
 
@@ -23,30 +25,39 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class SpawnTeammateTool implements Tool {
     private static final int MAX_TEAMMATE_TURNS = 10;
+    private static final long IDLE_TIMEOUT_TIME = 60000; // 60s
+    private static final long IDLE_SLEEP_TIME = 5000; // 5s
     private final int INBOX_NONE = 0;
-    private final int INBOX_CONTINUE =1;
+    private final int INBOX_CONTINUE = 1;
     private final int INBOX_SHUTDOWN = 2;
+    private final int INBOX_TIMEOUT = 3; //s15 超时
     private final File workdir;
     private final MessageBus messageBus;
     private final String model;
     private final String baseUrl;
     private final String apiKey;
     private final String promptTemplate;
-    private final ProtocolService service;
+    private final ProtocolService protocolService;
+    private final TaskService taskService;
     private final Set<String> activeTeammates = ConcurrentHashMap.newKeySet();
 
     public SpawnTeammateTool(File workdir, MessageBus messageBus, String baseUrl, String apiKey, String model, String promptTemplate) {
         this(workdir, messageBus, baseUrl, apiKey, model, promptTemplate, null);
     }
 
-    public SpawnTeammateTool(File workdir, MessageBus messageBus, String baseUrl, String apiKey, String model, String promptTemplate, ProtocolService service) {
+    public SpawnTeammateTool(File workdir, MessageBus messageBus, String baseUrl, String apiKey, String model, String promptTemplate, ProtocolService protocolService) {
+        this(workdir, messageBus, baseUrl, apiKey, model, promptTemplate, protocolService, null);
+    }
+
+    public SpawnTeammateTool(File workdir, MessageBus messageBus, String baseUrl, String apiKey, String model, String promptTemplate, ProtocolService protocolService, TaskService taskService) {
         this.workdir = workdir;
         this.messageBus = messageBus;
         this.baseUrl = baseUrl;
         this.apiKey = apiKey;
         this.model = model;
         this.promptTemplate = promptTemplate;
-        this.service = service;
+        this.protocolService = protocolService;
+        this.taskService = taskService;
     }
 
     /**
@@ -104,11 +115,11 @@ public class SpawnTeammateTool implements Tool {
         //3.创建subAgentLoop
         Thread thread = new Thread(() -> {
             try {
-                runTeammate(agentName, agentRole, agentPrompt);
+                runTeammate(agentName, agentRole.trim(), agentPrompt.trim());
             } catch (Exception e) {
                 throw new RuntimeException(e);
             }
-        });
+        }, "my-claude-code-teammate-" + agentName);
 
         thread.setDaemon(true);
         thread.start();
@@ -123,12 +134,18 @@ public class SpawnTeammateTool implements Tool {
                     .registry(new WriteFileTool(workdir))
                     .registry(new ReadFileTool(workdir))
                     .registry(new SendMessageTool(messageBus, agentName));
-            if (service != null) {
-                registry.registry(new SubmitPlanTool(service, agentName));
+            if (protocolService != null) {
+                registry.registry(new SubmitPlanTool(protocolService, agentName));
+            }
+            if (taskService != null) {
+                registry.registry(new ClaimTaskTool(taskService,agentName))
+                        .registry(new CompleteTaskTool(taskService))
+                        .registry(new ListTaskTool(taskService));
+
             }
             AnthropicLLMClient client = new AnthropicLLMClient(config(String.format(promptTemplate, agentName, agentRole, workdir.getAbsolutePath())));
             //普通模式 or 协议模式
-            AssistantMessage resp = service == null ? runSimpleTurnLoop(agentName, agentPrompt, client, registry)
+            AssistantMessage resp = protocolService == null ? runSimpleTurnLoop(agentName, agentPrompt, client, registry)
                     : runProtocolLoop(agentName, agentPrompt, client, registry);
             String summary = extractText(resp);
             if (summary.isBlank()) {
@@ -168,35 +185,97 @@ public class SpawnTeammateTool implements Tool {
         List<Message> history = new ArrayList<>();
         history.add(Message.user(prompt));
         AssistantMessage lastResp = null;
-        for (int i = 0; i < MAX_TEAMMATE_TURNS; i++) {
-            //inject最新的mailBox
-            int shouldAction = injectTeammateInbox(name,history);
-            if( shouldAction == INBOX_SHUTDOWN){
-                return lastResp;
-            }
-            //chat
-            AssistantMessage resp = client.chat(history, toolRegistry.definitions());
-            lastResp = resp;
-            history.add(Message.assistant(resp.getContent()));
-
-            //execute tool
-            List<ToolResultBlock> blocks = executeToolUses(resp, toolRegistry);
-            if(!"tool_use".equals(resp.getStopReason()) || blocks.isEmpty()){
-                //不直接返回 而是睡眠 等待mailBox中的消息
-                int idleAction = idleUntilMessage(name, history);
-                if (idleAction == INBOX_SHUTDOWN) {
+        while(true){
+            boolean reachMaxTurns = true;
+            for (int i = 0; i < MAX_TEAMMATE_TURNS; i++) {
+                //inject最新的mailBox
+                int shouldAction = injectTeammateInbox(name, history);
+                if (shouldAction == INBOX_SHUTDOWN) {
                     return lastResp;
                 }
-                continue;
+                //chat
+                AssistantMessage resp = client.chat(history, toolRegistry.definitions());
+                lastResp = resp;
+                history.add(Message.assistant(resp.getContent()));
+
+                //execute tool
+                List<ToolResultBlock> resultBlocks = executeToolUses(resp, toolRegistry);
+                //进入idle状态
+                if (!"tool_use".equals(resp.getStopReason()) || resultBlocks.isEmpty()) {
+                    // s15 -> 等待mailBox中的消息 or 认领实现无人做的任务
+                    int idleAction = idleDo(name, history);
+                    if (idleAction == INBOX_SHUTDOWN || idleAction == INBOX_TIMEOUT) {
+                        return lastResp;
+                    }
+                    reachMaxTurns = false;
+                    //新一轮agentLoop开始
+                    break;
+                }
+                history.add(Message.toolResults(resultBlocks));
             }
-            history.add(Message.toolResults(blocks));
+            //进入idle
+            if(reachMaxTurns){
+                int idleAction = idleDo(name, history);
+                if(idleAction == INBOX_SHUTDOWN || idleAction == INBOX_TIMEOUT){
+                    return lastResp;
+                }
+            }
         }
-        return lastResp;
+    }
+
+    private int idleDo(String agentName, List<Message> history) {
+        return taskService == null
+                ? idleUntilMessage(agentName, history)
+                : idleUntilClaimTask(agentName,history);
+    }
+    private int idleUntilClaimTask(String agentName,List<Message> history){
+        long endTime = System.currentTimeMillis() + IDLE_TIMEOUT_TIME;
+        while(System.currentTimeMillis() < endTime){
+            sleep(IDLE_SLEEP_TIME);
+            //优先级1 -> 处理mailBox的消息
+            int mailboxCode = injectTeammateInbox(agentName, history);
+            if(mailboxCode != INBOX_NONE){
+                return mailboxCode;
+            }
+            //优先级2 -> claim idle task
+            int taskCode = injectAutoClaimedTask(agentName,history);
+            if(taskCode != INBOX_NONE){
+                return taskCode;
+            }
+        }
+        System.out.println("  [idle] " + agentName + " timeout (60s)");
+        return INBOX_TIMEOUT;
+    }
+
+    private int injectAutoClaimedTask(String agentName,List<Message> history){
+        if(taskService == null){
+            return INBOX_NONE;
+        }
+        List<TaskRecord> taskRecords = taskService.scanUnClaimedTask();
+        for(TaskRecord record : taskRecords){
+            String result = taskService.claimTask(record.getId(), agentName);
+            if(result.startsWith("Claimed ")){
+                String content = "<auto-claimed>\n"
+                        + "Task " + record.getId() + ": " + record.getSubject() + "\n"
+                        + "Description: " + nullToEmpty(record.getDescription()) + "\n"
+                        + "</auto-claimed>";
+                history.add(Message.user(content));
+                System.out.println("  [idle] " + agentName + " auto-claimed: "
+                        + record.getSubject());
+                return INBOX_CONTINUE;
+            }
+            System.out.println("  [idle] " + agentName + " claim failed: " + result);
+        }
+        return INBOX_NONE;
+    }
+
+    private String nullToEmpty(String str){
+        return str == null ? "" : str;
     }
 
     private int idleUntilMessage(String name, List<Message> messages) {
         while (true) {
-            sleepOneSecond();
+            sleep(1000L);
             int inboxAction = injectTeammateInbox(name, messages);
             if (inboxAction != INBOX_NONE) {
                 return inboxAction;
@@ -204,11 +283,10 @@ public class SpawnTeammateTool implements Tool {
         }
     }
 
-    private void sleepOneSecond() {
+    private void sleep(long sleepTime) {
         try {
-            Thread.sleep(1000);
-        }
-        catch (InterruptedException e) {
+            Thread.sleep(sleepTime);
+        } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Teammate interrupted", e);
         }
@@ -239,8 +317,8 @@ public class SpawnTeammateTool implements Tool {
 
         List<TeamMessage> normalMessages = new ArrayList<>();
         for (TeamMessage message : inbox) {
-            if (service != null && service.isProtocolMessage(message)) {
-                boolean shouldStop = service.handleTeammateProtocolMessage(name, message, messages);
+            if (protocolService != null && protocolService.isProtocolMessage(message)) {
+                boolean shouldStop = protocolService.handleTeammateProtocolMessage(name, message, messages);
                 if (shouldStop) {
                     return INBOX_SHUTDOWN;
                 }

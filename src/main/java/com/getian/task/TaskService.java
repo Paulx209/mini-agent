@@ -4,6 +4,7 @@ import com.alibaba.fastjson.JSON;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class TaskService {
     private final TaskStore taskStore;
@@ -83,7 +84,11 @@ public class TaskService {
         if (!PENDING.equals(oldStatus)) {
             return "Task status is not 'pending',cannot claim. [taskId:" + taskId + " status:" + oldStatus + "]";
         }
-        //2.是否存在依赖阻塞的任务还没完成
+        //2.判断当前的owner是否为null
+        if(taskRecord.getOwner()!=null && !taskRecord.getOwner().isBlank()){
+            return "Task owner is not null , this task was claimed by " + taskRecord.getOwner();
+        }
+        //3.是否存在依赖阻塞的任务还没完成
         List<String> blockingDependencies = blockingDependencies(taskRecord);
         if (!blockingDependencies.isEmpty()) {
             return "blocked by " + blockingDependencies;
@@ -113,6 +118,16 @@ public class TaskService {
         return message;
     }
 
+    public List<TaskRecord> scanUnClaimedTask() {
+        return taskStore.list().stream().filter(this::filterMethod).collect(Collectors.toList());
+    }
+
+    private boolean filterMethod(TaskRecord record) {
+        return PENDING.equals(record.getStatus())
+                && blockingDependencies(record).isEmpty()
+                && (record.getOwner() == null || record.getOwner().isBlank());
+    }
+
     /**
      * 找到该时刻没有上游阻塞任务的task
      */
@@ -132,6 +147,10 @@ public class TaskService {
     private List<String> blockingDependencies(TaskRecord task) {
         List<String> blockedTaskIds = new ArrayList<>();
         for (String taskId : task.getBlockedBy()) {
+            if(!taskStore.exists(taskId)){
+                blockedTaskIds.add(taskId);
+                continue;
+            }
             TaskRecord taskRecord = taskStore.loadByTaskId(taskId);
             if (!"completed".equals(taskRecord.getStatus())) {
                 blockedTaskIds.add(taskId);
