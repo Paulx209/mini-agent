@@ -12,6 +12,7 @@ import com.getian.team.TeamMessage;
 import com.getian.tool.*;
 import com.getian.utils.AnthropicClientUtils;
 
+import javax.sound.sampled.Port;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,7 +38,72 @@ public class S15AutonomousAgentsDemo {
 
 
     public static void main(String[] args) {
+        File workDir = new File(".");
+        BackgroundTasks manager = new BackgroundTasks();
+        MessageBus messageBus = new MessageBus(workDir);
+        ProtocolService protocolService = new ProtocolService(messageBus);
+        TaskService  taskService = new TaskService(new TaskStore(workDir));
         AnthropicConfig config = AnthropicClientUtils.defaultAnthropicConfig(LEAD_SYSTEM_PROMPT);
+        AnthropicLLMClient llmClient = new AnthropicLLMClient(config);
+        AgentLoopListener listener = AnthropicClientUtils.createSimpleAgentLoopListener();
+        ToolRegistry registry = AnthropicClientUtils.createSimpleToolRegistry(workDir);
+        //subtask相关
+        registry.registry(new CreateTaskTool(taskService))
+                .registry(new GetTaskTool(taskService))
+                .registry(new CompleteTaskTool(taskService))
+                .registry(new ListTaskTool(taskService))
+                .registry(new ClaimTaskTool(taskService));
 
+        //spawn 相关
+        registry.registry(new SpawnTeammateTool(workDir,messageBus,config.getBaseUrl(),
+                config.getApiKey(),config.getModel(),TEAMMATE_SYSTEM_PROMPT_TEMPLATE,protocolService,taskService))
+                .registry(new SendMessageTool(messageBus,"lead"))
+                .registry(new ProtocolCheckInboxTool(protocolService,messageBus))
+                .registry(new RequestShutdownTool(protocolService))
+                .registry(new RequestPlanTool(protocolService))
+                .registry(new ReviewPlanTool(protocolService));
+
+
+        BackgroundAgentLoop agentLoop = new BackgroundAgentLoop(manager,llmClient,registry,listener,50);
+
+        List<Message> history = new ArrayList<>();
+
+        System.out.println("s15: Autonomous Agents");
+        System.out.println("输入问题，回车发送。输入 q 退出。\n");
+        Scanner scanner = new Scanner(System.in);
+        while (true) {
+            System.out.print("s15 >> ");
+            injectLeadIndex(protocolService,messageBus,history);
+            if (!scanner.hasNextLine()) {
+                break;
+            }
+            String query = scanner.nextLine();
+            if (query == null || query.isBlank() || "q".equalsIgnoreCase(query.trim())
+                    || "exit".equalsIgnoreCase(query.trim())) {
+                break;
+            }
+            history.add(Message.user(query));
+            AssistantMessage resp = agentLoop.run(history);
+            printText(resp);
+        }
+    }
+    private static void injectLeadIndex(ProtocolService protocol,MessageBus messageBus,List<Message> history){
+        List<TeamMessage> messageList = protocol.consumeLeadInBox();
+        if(messageList.isEmpty()){
+            return;
+        }
+        history.add(Message.user("[Inbox]\n" + messageBus.formatInbox(messageList)));
+        System.out.println("  [Inbox: " + messageList.size() + " messages injected]");
+    }
+
+    private static void printText(AssistantMessage answer) {
+        if (answer == null || answer.getContent() == null) {
+            return;
+        }
+        for (ContentBlock block : answer.getContent()) {
+            if (block instanceof TextBlock) {
+                System.out.println(((TextBlock) block).getText());
+            }
+        }
     }
 }
