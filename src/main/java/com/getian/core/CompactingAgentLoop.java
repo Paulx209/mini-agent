@@ -59,10 +59,14 @@ public class CompactingAgentLoop {
             } catch (Exception e) {
                 //3.message length too long  -> llm compact + recent messages
                 if (isPromptTooLong(e) && reactiveRetries < 1) {
+                    //messageList不会全部传入请求体中 会截断
                     List<Message> messages = compactionPipeline.reactiveCompact(messageList);
                     messageList.clear();
                     messageList.addAll(messages);
+                    reactiveRetries++;
+                    continue;
                 }
+                throw e;
             }
             listener.onAssistantMessage(resp);
             //4.判断是否包括compact tool
