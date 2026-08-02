@@ -34,7 +34,11 @@ public class S04HooksDemo {
             }
 
             //userPromptSubmit trigger
-            triggerUserPromptSubmitHook(simpleAgentLoop.getHookManager(),prompt);
+            HookDecision hookDecision = triggerUserPromptSubmitHook(simpleAgentLoop.getHookManager(), prompt);
+            if(hookDecision.isBlocked()){
+                System.out.println("Error : user prompt is blocked , caused by : " + hookDecision.getMessage());
+                continue;
+            }
 
             Message user = Message.user(prompt);
             history.add(user);
