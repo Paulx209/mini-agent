@@ -9,11 +9,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 
 public class WriteFileTool implements Tool {
-    private final File fileDir;
     private final PathGuard pathGuard;
 
     public WriteFileTool(File fileDir) {
-        this.fileDir = fileDir;
         this.pathGuard = new PathGuard(fileDir);
     }
 
@@ -55,7 +53,7 @@ public class WriteFileTool implements Tool {
 
     @Override
     public ToolResult execute(JSONObject input) {
-        String path = input.getString("path");
+        String path = input == null ? "" : input.getString("path");
         if (path == null || path.isBlank()) {
             return new ToolResult("Error: No path provided");
         }

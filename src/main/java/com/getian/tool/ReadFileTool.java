@@ -6,12 +6,9 @@ import com.alibaba.fastjson.JSONObject;
 import java.io.*;
 
 public class ReadFileTool implements Tool {
-    private final File workDir;
-
     private final PathGuard pathGuard;
 
     public ReadFileTool(File workDir) {
-        this.workDir = workDir;
         this.pathGuard = new PathGuard(workDir);
     }
 
@@ -49,8 +46,8 @@ public class ReadFileTool implements Tool {
 
     @Override
     public ToolResult execute(JSONObject input) {
-        String path = input.getString("path");
-        if (path == null || path.isEmpty()) {
+        String path = input == null ? "" : input.getString("path");
+        if (path == null || path.isBlank()) {
             return new ToolResult("Error: No path provided");
         }
         Integer limitLines = input.getInteger("limit");
