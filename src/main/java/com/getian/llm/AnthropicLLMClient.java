@@ -87,11 +87,7 @@ public class AnthropicLLMClient implements LLMClient {
      */
     public String messageUrl() {
         String baseUrl = config.getBaseUrl();
-        if (baseUrl.endsWith("/")) {
-            baseUrl = baseUrl + "v1/messages";
-        }
-        baseUrl = baseUrl + "/v1/messages";
-        return baseUrl;
+        return baseUrl.endsWith("/") ? baseUrl + "v1/messages" : baseUrl + "/v1/messages";
     }
 
     public JSONObject toRequestJson(List<Message> messageList, List<ToolDefinition> tools) {
