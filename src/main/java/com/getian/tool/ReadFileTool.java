@@ -58,7 +58,7 @@ public class ReadFileTool implements Tool {
             BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(finalPath)));
             String line;
             while ((line = reader.readLine()) != null) {
-                if (limitLines != null && limitLines > 0 && lineCount > limitLines) {
+                if (limitLines != null && limitLines > 0 && lineCount >= limitLines) {
                     content.append("... output truncated by limit=").append(limitLines);
                     break;
                 }
