@@ -33,8 +33,8 @@ public class BackgroundDecider {
     /**
      * 判断要执行的命令类型是否在 slow_keywords 数组中
      */
-    private static boolean isSlowAction(String toolName,JSONObject inputSchema){
-        String command = inputSchema.getString("command");
+    private static boolean isSlowAction(String toolName,JSONObject input){
+        String command = input == null  ? "" : input.getString("command");
         if(command == null || command.isBlank()){
             return false;
         }
