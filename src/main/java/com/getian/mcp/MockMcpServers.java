@@ -105,10 +105,10 @@ public class MockMcpServers {
             if (city == null || city.isBlank()) {
                 return "Mcp Error : city is required";
             }
-            if (!mockData.containsKey(city)) {
+            String key = city.trim().toLowerCase();
+            if (!mockData.containsKey(key)) {
                 return "Mcp Error: city is invalid";
             }
-            String key = city.trim().toLowerCase();
             return "[weather] " + mockData.getOrDefault(key,
                     city.trim() + ": 22C, partly cloudy, mock weather");
         });
