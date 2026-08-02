@@ -59,7 +59,7 @@ public class BackgroundTasks {
         List<String> bgIds = new ArrayList<>();
         for (Map.Entry<String, BackgroundTask> entry : tasks.entrySet()) {
             BackgroundTask task = entry.getValue();
-            if (COMPLETED.equals(task.getStatus())) {
+            if (!RUNNING.equals(task.getStatus())) {
                 bgIds.add(entry.getKey());
             }
         }
