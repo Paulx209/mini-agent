@@ -1,6 +1,7 @@
 package com.getian.permission;
 
 import com.getian.core.ToolUseBlock;
+import com.getian.tool.PathGuard;
 
 import java.io.File;
 import java.io.IOException;
@@ -60,11 +61,8 @@ public class PermissionManager {
         }
         //判断当前文件写入的路径是否是项目路径？
         try {
-            File target = new File(workDir, path).getCanonicalFile();
-            File source = workDir.getCanonicalFile();
-            if (!target.toPath().startsWith(source.toPath())) {
-                return PermissionDecision.deny("Permission denied : path escapes workspace");
-            }
+            PathGuard pathGuard = new PathGuard(workDir);
+            pathGuard.resolve(path);
             return PermissionDecision.allow();
         } catch (IOException e) {
             return PermissionDecision.deny("Permission denied: " + e.getMessage());

@@ -11,11 +11,16 @@ public class AnthropicConfig {
     private String model;
     private String apiKey;
     private String systemPrompt;
-    private int maxTokens = MAX_TOKENS;
+    private int maxTokens;
     public AnthropicConfig(String baseUrl,String model,String apiKey,String systemPrompt){
+        this(baseUrl,model,apiKey,systemPrompt,MAX_TOKENS);
+    }
+
+    public AnthropicConfig(String baseUrl,String model,String apiKey,String systemPrompt,int maxTokens){
         this.baseUrl = baseUrl;
         this.model = model;
         this.apiKey = apiKey;
         this.systemPrompt = systemPrompt;
+        this.maxTokens = maxTokens;
     }
 }
