@@ -39,12 +39,10 @@ public class AnthropicClientUtils {
     }
 
     public static AnthropicLLMClient createClient(Properties properties, String systemPrompt) {
-        AnthropicConfig config = new AnthropicConfig();
-        config.setModel(required(properties, MODEL_KEY));
-        config.setApiKey(required(properties, API_KEY));
-        config.setBaseUrl(required(properties, BASE_URL_KEY));
-        config.setSystemPrompt(systemPrompt);
-        return new AnthropicLLMClient(config);
+        String model = required(properties, MODEL_KEY);
+        String apiKey = required(properties, API_KEY);
+        String baseUrl = required(properties, BASE_URL_KEY);
+        return new AnthropicLLMClient(new AnthropicConfig(baseUrl,model,apiKey,systemPrompt));
     }
 
     public static AnthropicConfig defaultAnthropicConfig(String systemPrompt){
