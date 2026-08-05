@@ -5,6 +5,7 @@ import com.getian.core.ToolUseBlock;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 
 /**
  *@Author: sonicge
@@ -12,15 +13,22 @@ import java.util.List;
  */
 
 public class BashPermissionCheck implements CheckPermissionStrategy{
-    private final ApprovalPrompter approvalPrompter;
+    private  ApprovalPrompter approvalPrompter;
     // 直接拦截的集合 —— 黑名单
     private final List<String> denyList = Arrays.asList("rm -rf /", "sudo", "shutdown", "reboot", "mkfs", "dd if=",
             "> /dev/sda");
     // 需要询问的命令集合
     private final List<String> askList = Arrays.asList("rm ", "> /etc/", "chmod 777");
 
+    public BashPermissionCheck(){}
+
     public BashPermissionCheck(ApprovalPrompter approvalPrompter){
         this.approvalPrompter = approvalPrompter;
+    }
+
+    @Override
+    public Set<String> supportedTools() {
+        return Set.of("bash");
     }
 
     @Override
@@ -30,6 +38,7 @@ public class BashPermissionCheck implements CheckPermissionStrategy{
         if(command == null || command.isBlank()){
             return PermissionDecision.deny("Error : command is blank");
         }
+        command = command.toLowerCase();
         //1.判断是否在denyList中
         for(String pattern : denyList){
             if(command.contains(pattern)){
@@ -47,5 +56,11 @@ public class BashPermissionCheck implements CheckPermissionStrategy{
         }
         //3.放行
         return PermissionDecision.allow();
+    }
+
+    @Override
+    public CheckPermissionStrategy create(PermissionContext context) {
+        ApprovalPrompter approvalPrompter = context.getApprovalPrompter();
+        return new BashPermissionCheck(approvalPrompter);
     }
 }

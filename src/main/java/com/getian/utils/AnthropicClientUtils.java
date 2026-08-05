@@ -1,13 +1,13 @@
 package com.getian.utils;
 
 import com.getian.core.*;
-import com.getian.hooks.Hook;
 import com.getian.hooks.HookDecision;
 import com.getian.hooks.HookEvent;
 import com.getian.hooks.HookManager;
 import com.getian.llm.AnthropicConfig;
 import com.getian.llm.AnthropicLLMClient;
 import com.getian.permission.ConsoleApprovalPrompter;
+import com.getian.permission.PermissionContext;
 import com.getian.permission.PermissionManager;
 import com.getian.tool.*;
 
@@ -81,7 +81,8 @@ public class AnthropicClientUtils {
     }
 
     public static PermissionManager createPermissionManager(File workDir) {
-        return new PermissionManager(workDir, new ConsoleApprovalPrompter(new Scanner(System.in)));
+        PermissionContext context = new PermissionContext(workDir,new ConsoleApprovalPrompter(new Scanner(System.in)));
+        return new PermissionManager(context);
     }
 
     public static HookManager createHookManager(File workDir){
