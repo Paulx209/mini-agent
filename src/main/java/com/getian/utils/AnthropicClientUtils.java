@@ -4,6 +4,7 @@ import com.getian.core.*;
 import com.getian.hooks.HookDecision;
 import com.getian.hooks.HookEvent;
 import com.getian.hooks.HookManager;
+import com.getian.hooks.MyPreToolUseHook;
 import com.getian.llm.AnthropicConfig;
 import com.getian.llm.AnthropicLLMClient;
 import com.getian.permission.ConsoleApprovalPrompter;
@@ -85,6 +86,9 @@ public class AnthropicClientUtils {
 
     public static HookManager createHookManager(File workDir){
         HookManager hookManager = new HookManager();
+        PermissionManager permissionManager = new PermissionManager(new PermissionContext(workDir,new ConsoleApprovalPrompter(new Scanner(System.in))));
+
+        MyPreToolUseHook preToolUseHook = new MyPreToolUseHook(permissionManager);
         hookManager.register(HookEvent.USER_PROMPT_SUBMIT, context -> {
             System.out.println("[HOOK] UserPromptSubmit: working in " + workDir.getAbsolutePath());
             return HookDecision.pass();
@@ -95,6 +99,8 @@ public class AnthropicClientUtils {
             System.out.println("[HOOK] PreToolUse: " + toolUseBlock.getName() + ", input: " + toolUseBlock.getInput());
             return HookDecision.pass();
         });
+
+        hookManager.register(HookEvent.PRE_TOOL_USE,preToolUseHook);
 
         hookManager.register(HookEvent.POST_TOOL_USE,context -> {
             String content = context.getToolResult() == null ? "" : context.getToolResult().getContent();
@@ -124,9 +130,9 @@ public class AnthropicClientUtils {
         AnthropicLLMClient client = createClient();
         ToolRegistry toolRegistry = createSimpleToolRegistry(workDir);
         AgentLoopListener agentLoopListener = createSimpleAgentLoopListener();
-        PermissionManager permissionManager = createPermissionManager(workDir);
+//        PermissionManager permissionManager = createPermissionManager(workDir);
         HookManager hookManager = createHookManager(workDir);
-        return new AgentLoop(client, toolRegistry, agentLoopListener, permissionManager,hookManager);
+        return new AgentLoop(client, toolRegistry, agentLoopListener, null,hookManager);
     }
 
     private static String preview(String content) {
