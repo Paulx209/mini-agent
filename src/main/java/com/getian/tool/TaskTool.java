@@ -16,7 +16,7 @@ public class TaskTool implements Tool {
     }
 
     /**
-     *   "name": "task",
+     *   "name": "subtask",
      *   "description": "Launch a subagent for a complex subtask. Returns only the final summary.",
      *   "input_schema": {
      *     "type": "object",
@@ -29,7 +29,7 @@ public class TaskTool implements Tool {
      */
     @Override
     public ToolDefinition getDefinition() {
-        String name = "task";
+        String name = "subtask";
         String description = "Launch a subagent for a complex subtask. Returns only the final summary.";
         JSONObject inputSchema = new JSONObject()
                 .fluentPut("type", "object")

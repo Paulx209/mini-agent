@@ -119,12 +119,12 @@ public class AgentLoop {
                 //1.AgentLoopListener
                 listener.beforeToolUse(toolUseBlock);
 
-//                //2.permission manager
-//                PermissionDecision decision = checkPermission(toolUseBlock);
-//                if(!decision.isAllowed()){
-//                    results.add(new ToolResultBlock(toolUseBlock.getId(),decision.getMessage()));
-//                    continue;
-//                }
+                //2.permission manager | 传null 即可
+                PermissionDecision decision = checkPermission(toolUseBlock);
+                if(!decision.isAllowed()){
+                    results.add(new ToolResultBlock(toolUseBlock.getId(),decision.getMessage()));
+                    continue;
+                }
 
                 //3.preToolUseHook trigger
                 HookDecision hookDecision = triggerPreToolUseHooks(toolUseBlock);

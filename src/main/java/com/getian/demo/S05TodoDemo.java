@@ -28,9 +28,8 @@ public class S05TodoDemo {
         AnthropicLLMClient client = AnthropicClientUtils.createClient(SYSTEM_PROMPT);
         ToolRegistry registry = AnthropicClientUtils.createSimpleToolRegistry(new File(".")).registry(new TodoWriteTool());
         AgentLoopListener listener = AnthropicClientUtils.createSimpleAgentLoopListener();
-        PermissionManager permissionManager = AnthropicClientUtils.createPermissionManager(new File("."));
         HookManager hookManager = AnthropicClientUtils.createHookManager(new File("."));
-        AgentLoop agentLoop = new AgentLoop(client,registry,listener,permissionManager,hookManager);
+        AgentLoop agentLoop = new AgentLoop(client,registry,listener,null,hookManager);
 
         System.out.println("s05: Todo");
         System.out.println("输入问题，回车发送。输入 q 退出。\n");
