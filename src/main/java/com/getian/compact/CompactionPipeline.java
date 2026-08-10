@@ -83,10 +83,14 @@ public class CompactionPipeline {
             if (original.length() > PREVIEW_CHARS) {
                 fixed = toolResultStore.persist(result);
             } else {
+                //由于工具结果是降序排的，只要当前工具结果的长度是 < preview_chars的，就可以直接return了
+                return;
+            }
+            if(original.length() <= fixed.length()){
                 return;
             }
             result.setContent(fixed);
-            totalLength -= (original.length() - fixed.length());
+            totalLength -= original.length() - fixed.length();
         }
     }
 
