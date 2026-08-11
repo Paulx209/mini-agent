@@ -76,10 +76,8 @@ public class S09MemoryDemo {
             Message message = memoryManager.injectRelevantMemories(history, query);
             history.add(message);
 
-            //3.保留会话之前的上下文 防止被压缩掉
-            List<Message> preCompactSnapShot = agentLoop.snapshot(history);
-            //4.开始一次完整对话
-            AssistantMessage resp = agentLoop.run(history, preCompactSnapShot);
+            //3.开始一次完整对话
+            AssistantMessage resp = agentLoop.run(history);
             for(ContentBlock block :resp.getContent()){
                 if(block instanceof TextBlock){
                     System.out.println(((TextBlock)block).getText());

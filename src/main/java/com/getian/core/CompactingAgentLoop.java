@@ -2,15 +2,13 @@ package com.getian.core;
 
 import com.alibaba.fastjson.JSONObject;
 import com.getian.compact.CompactionPipeline;
-import com.getian.compact.ToolResultStore;
+import com.getian.compact.MessageSnapShots;
 import com.getian.llm.AnthropicLLMClient;
 import com.getian.tool.Tool;
 import com.getian.tool.ToolRegistry;
 import com.getian.tool.ToolResult;
 
 import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 
 public class CompactingAgentLoop {
@@ -48,6 +46,10 @@ public class CompactingAgentLoop {
     }
 
     public AssistantMessage run(List<Message> messageList) {
+        return runWithTrace(messageList,MessageSnapShots.copy(messageList));
+    }
+
+    public AssistantMessage runWithTrace(List<Message> messageList, List<Message> preCompactSnapshot){
         int reactiveRetries = 0;
         for (int i = 0; i < maxTurns; i++) {
             //1.调用之前先压缩一下
@@ -71,11 +73,12 @@ public class CompactingAgentLoop {
             listener.onAssistantMessage(resp);
             //4.判断是否包括compact tool
             if (hasCompactTool(resp)) {
-                handleCompactToolUse(messageList, resp);
+                handleCompactToolUse(messageList, resp,preCompactSnapshot);
                 continue;
             }
             //5.不包含compact tool
             messageList.add(Message.assistant(resp.getContent()));
+            preCompactSnapshot.add(MessageSnapShots.copy(Message.assistant(resp.getContent())));
             List<ToolResultBlock> toolResults = executeToolUses(resp);
             if (!"tool_use".equals(resp.getStopReason()) || toolResults.isEmpty()) {
                 listener.onStop(resp);
@@ -83,11 +86,12 @@ public class CompactingAgentLoop {
             }
             //toolResults加入Message
             messageList.add(Message.toolResults(toolResults));
+            preCompactSnapshot.add(MessageSnapShots.copy(Message.toolResults(toolResults)));
         }
         throw new IllegalStateException("Compacting agent loop reached max turns: " + maxTurns);
     }
 
-    private void handleCompactToolUse(List<Message> messages, AssistantMessage resp) {
+    private void handleCompactToolUse(List<Message> messages, AssistantMessage resp,List<Message> preCompactSnapshot) {
         //第一步 找到compact tool_use 找到focus
         String focus = "manual compact";
         for (ContentBlock block : resp.getContent()) {
@@ -106,6 +110,7 @@ public class CompactingAgentLoop {
         messages.addAll(summaryMessage);
         //第三步 将resp当前的content加入到messages中
         messages.add(Message.assistant(resp.getContent()));
+        preCompactSnapshot.add(MessageSnapShots.copy(Message.assistant(resp.getContent())));
         //第四步 开始执行resp中的其他tool
         List<ToolResultBlock> results = new ArrayList<>();
         for (ContentBlock block : resp.getContent()) {
@@ -124,6 +129,7 @@ public class CompactingAgentLoop {
             }
         }
         messages.add(Message.toolResults(results));
+        preCompactSnapshot.add(MessageSnapShots.copy(Message.toolResults(results)));
     }
 
     private List<ToolResultBlock> executeToolUses(AssistantMessage message) {

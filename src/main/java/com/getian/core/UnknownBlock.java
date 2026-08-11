@@ -12,7 +12,7 @@ import lombok.Data;
 public class UnknownBlock extends ContentBlock {
     private JSONObject raw;
 
-    protected UnknownBlock(String type, JSONObject raw) {
+    public UnknownBlock(String type, JSONObject raw) {
         super(type);
         this.raw = raw;
     }
