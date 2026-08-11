@@ -17,7 +17,7 @@ public class CompactionPipeline {
     private static final int KEEP_RECENT_TOOL_RESULTS = 3;
     private static final int MAX_MESSAGES = 50;
     private static final int TOOL_RESULT_BUDGET = 200000;
-    private static final int AUTO_COMPACT_THRESHOLD = 50000;
+    private static final int AUTO_COMPACT_THRESHOLD = 100000;
     private static final int PREVIEW_CHARS = 2000;
     private static final int MICRO_COMPACT_MIN_LENGTH = 120;
 
