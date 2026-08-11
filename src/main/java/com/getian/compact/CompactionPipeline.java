@@ -219,6 +219,9 @@ public class CompactionPipeline {
         return value;
     }
 
+    /**
+     * 调用 LLM 压缩上下文后，再拼接最近的10条消息
+     */
     public List<Message> reactiveCompact(List<Message> messages) {
         List<Message> compacted = compactHistory(messages, "reactive prompt too long");
         int start = Math.max(0, messages.size() - 10);

@@ -16,5 +16,5 @@ public class Memory {
     private String name;
     private String description;
     private String body;
-    private String type;
+    private String type; //user feedback project reference
 }

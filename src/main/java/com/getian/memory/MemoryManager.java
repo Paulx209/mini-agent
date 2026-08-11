@@ -5,6 +5,10 @@ import com.getian.core.Message;
 
 import java.util.List;
 
+/**
+ *  @Author: sonicge
+ *  @CreateTime: 2026-07-19
+ */
 public class MemoryManager {
     private final MessageInspector inspector = new MessageInspector();
     private final MemoryStore memoryStore;

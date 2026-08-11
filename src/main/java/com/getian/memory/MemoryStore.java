@@ -8,16 +8,16 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+/**
+ *  @Author: sonicge
+ *  @CreateTime: 2026-07-19
+ */
 public class MemoryStore {
     //memory文件夹路径
     private final File memoryDir;
 
     public MemoryStore(File workDir) {
         this.memoryDir = new File(workDir, ".memory");
-    }
-
-    public File getMemoryDir() {
-        return this.memoryDir;
     }
 
     /**
@@ -40,21 +40,10 @@ public class MemoryStore {
         return memoryList;
     }
 
-    public Memory findByFileName(String filename) {
-        if (filename == null || filename.isBlank() || filename.contains("..") || filename.contains("/")) {
-            return null;
-        }
-        File file = new File(memoryDir, filename);
-        if (!file.exists() || !file.isFile()) {
-            return null;
-        }
-        try {
-            return parse(file);
-        } catch (IOException e) {
-            return null;
-        }
-    }
 
+    /**
+     * 将概括出来的 新Memory 写到文件系统中
+     */
     public Memory write(Memory memory) {
         if (memory == null) {
             return null;
@@ -103,7 +92,7 @@ public class MemoryStore {
     public void deleteMemoryFiles(){
         ensureMemoryDir();
         File[] files = memoryDir.listFiles(file -> file.isFile()
-                && file.getName().endsWith("md")
+                && file.getName().endsWith(".md")
                 && !"MEMORY.md".equals(file.getName()));
         if(files == null || files.length == 0){
             return ;
@@ -116,6 +105,9 @@ public class MemoryStore {
         rebuildIndex();
     }
 
+    /**
+     * 读取 MEMORY.md 记忆索引文件
+     */
     public String indexContent(){
         File memoryIndex = new File(memoryDir,"MEMORY.md");
         if(!memoryIndex.exists() || !memoryIndex.isFile()){
@@ -137,8 +129,7 @@ public class MemoryStore {
     }
 
     /**
-     * 用于writeFile
-     * 将Memory写入file文件中
+     * 格式化memory
      */
     private String render(Memory memory) {
         return "---\n"
@@ -154,6 +145,9 @@ public class MemoryStore {
         return str == null ? "" : str;
     }
 
+    /**
+     * 生成唯一的文件名称 遇到重复的 通过index标识
+     */
     private String uniqueFilename(String slug) {
         String name = slug == null || slug.isBlank() ? "memory-" + System.currentTimeMillis() : slug;
         String filename = name + ".md";
@@ -166,7 +160,7 @@ public class MemoryStore {
     }
 
     /**
-     * 将xxx.md文件解析成Memory 用于list()函数
+     * 将xxx.md文件解析成Memory
      */
     private Memory parse(File file) throws IOException {
         String raw = Files.readString(file.toPath(), StandardCharsets.UTF_8);
@@ -208,5 +202,24 @@ public class MemoryStore {
             return type;
         }
         return "user";
+    }
+
+    public File getMemoryDir() {
+        return this.memoryDir;
+    }
+
+    public Memory findByFileName(String filename) {
+        if (filename == null || filename.isBlank() || filename.contains("..") || filename.contains("/")) {
+            return null;
+        }
+        File file = new File(memoryDir, filename);
+        if (!file.exists() || !file.isFile()) {
+            return null;
+        }
+        try {
+            return parse(file);
+        } catch (IOException e) {
+            return null;
+        }
     }
 }

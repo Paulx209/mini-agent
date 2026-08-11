@@ -1,11 +1,6 @@
 package com.getian.permission;
 
 import com.getian.core.ToolUseBlock;
-import com.getian.tool.PathGuard;
-
-import javax.naming.Context;
-import java.io.File;
-import java.io.IOException;
 import java.util.*;
 
 public class PermissionManager {
@@ -26,6 +21,10 @@ public class PermissionManager {
         return PermissionDecision.allow();
     }
 
+    /**
+     * 通过 SPI 机制加载 META-INF/services 下CheckPermissionStrategy接口的所有实现类
+     * @return
+     */
     private Map<String,CheckPermissionStrategy> loadCheckStrategies(){
         Map<String,CheckPermissionStrategy> map = new HashMap<>();
         ServiceLoader<CheckPermissionStrategy> strategies = ServiceLoader.load(CheckPermissionStrategy.class);

@@ -16,7 +16,7 @@ public class MemoryAgentLoop {
 
     public AssistantMessage run(List<Message> messages,List<Message> preCompactSnapShot){
         AssistantMessage resp = compactingAgentLoop.run(messages);
-        //把本轮生成的压缩内容加进去
+        //该轮的回话内容 + 上一轮的上下文
         preCompactSnapShot.add(Message.assistant(resp.getContent()));
         //提取记忆要使用压缩前的上下文，避免摘要把用户偏好、反馈等细节抹掉
         memoryManager.afterTurn(preCompactSnapShot);

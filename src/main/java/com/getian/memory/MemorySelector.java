@@ -14,6 +14,8 @@ import java.util.List;
 import java.util.Locale;
 
 /**
+ *  @Author: sonicge
+ *  @CreateTime: 2026-07-19
  * 根据当前问题选择相关记忆。
  * 1.调用大模型，根据最近对话历史和记忆目录去选择适当的记忆索引
  * 2.如果失败的话，使用关键词匹配进行兜底
@@ -26,6 +28,9 @@ public class MemorySelector {
         this.llmClient = llmClient;
     }
 
+    /**
+     * 选择相关记忆
+     */
     public List<Memory> select(List<Memory> memoryList, String recentSessionContext) {
         if (memoryList == null || memoryList.isEmpty()) {
             return Collections.emptyList();
@@ -39,6 +44,9 @@ public class MemorySelector {
         return selectWithKeyWords(memoryList, recentSessionContext);
     }
 
+    /**
+     * LLM 选择记忆index
+     */
     private List<Memory> selectWithLLM(List<Memory> memoryList, String recentSessionContext) {
         String prompt = "Given the recent conversation and the memory catalog below,\n"
                 + "select the indices of memories that are clearly relevant.\n"
@@ -61,6 +69,9 @@ public class MemorySelector {
         return selected;
     }
 
+    /**
+     * 通过关键字选择 --- 遍历所有Memory , 只要包含最近会话中的token内容 , 就是相关的
+     */
     private List<Memory> selectWithKeyWords(List<Memory> memoryList, String recentConversation) {
         List<Memory> selected = new ArrayList<>();
         String query = recentConversation == null ? "" : recentConversation.toLowerCase(Locale.ROOT);

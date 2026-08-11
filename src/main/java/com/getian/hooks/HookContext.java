@@ -15,11 +15,11 @@ import java.util.List;
 
 @Data
 public class HookContext {
-    private String event; //hook type
-    private String userPrompt;
-    private List<Message> messageList; //上下文
-    private ToolUseBlock toolUseBlock;
-    private ToolResult toolResult;
+    private String event; //hook type  [required]
+    private String userPrompt;// ->  for userPromptSubmit hook
+    private List<Message> messageList; // for stop hook
+    private ToolUseBlock toolUseBlock;//for preToolUSe hook
+    private ToolResult toolResult;//for afterToolUse hook
 
     public HookContext(String event){
         this.event = event;

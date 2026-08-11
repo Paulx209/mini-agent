@@ -105,8 +105,4 @@ public class SkillRegistry {
         return skillMap.get(name);
     }
 
-    public Collection<Skill> all() {
-        return skillMap.values();
-    }
-
 }

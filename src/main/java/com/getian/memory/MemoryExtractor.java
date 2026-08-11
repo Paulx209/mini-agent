@@ -15,7 +15,10 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * 每一轮对话结束之后，通过调用LLM的方式总结最近对话，提取最新以及，更新对应的索引
+ *
+ *  @Author: sonicge
+ *  @CreateTime: 2026-07-19
+ * 【新记忆从哪来】每一轮对话结束之后，通过调用LLM的方式总结最近对话，提取最新以及，更新对应的索引
  */
 public class MemoryExtractor {
     private final MessageInspector inspector = new MessageInspector();

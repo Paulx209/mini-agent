@@ -41,7 +41,7 @@ public class LoadSkillsTool implements Tool {
     @Override
     public ToolDefinition getDefinition() {
         String name = "load_skills";
-        String description = "Load the full body specifications and constraints of one or more specialized skills by their registered names. Call this tool to inject specific coding guidelines, UI standards, or workflow checklists into your context before performing tasks.";
+        String description = "Load the full instruction bodies of one or more registered skills by exact skill name. Use this when the user's request matches available skill descriptions, or when the user explicitly asks to use specific skills. Prefer loading multiple required skills in one call. Do not use for simple tasks or when no registered skill is relevant.";
         JSONObject inputSchema = new JSONObject()
                 .fluentPut("type", "object")
                 .fluentPut("properties", new JSONObject()

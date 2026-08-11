@@ -19,7 +19,7 @@ public class ToolResultStore {
     }
 
     public String persist(ToolResultBlock block){
-        //check directory exist
+        //check directory exist  if not exists,create directory
         if(!outputDir.exists() && !outputDir.mkdirs()){
             throw new IllegalStateException("Failed to create directory: " + outputDir);
         }

@@ -12,6 +12,10 @@ import com.getian.llm.LLMClient;
 import java.util.Collections;
 import java.util.List;
 
+/**
+ *  @Author: sonicge
+ *  @CreateTime: 2026-07-19
+ */
 public class MemoryConsolidator {
     private static final int CONSOLIDATE_THRESHOLD = 10;
     private final LLMClient llmClient;
@@ -20,6 +24,9 @@ public class MemoryConsolidator {
         this.llmClient = llmClient;
     }
 
+    /**
+     * memory size >= 10 -> 合并memory
+     */
     public void consolidate(MemoryStore memoryStore) {
         //1.获取所有的memory
         List<Memory> allMemories = memoryStore.list();
@@ -45,7 +52,6 @@ public class MemoryConsolidator {
             if(item == null || item.isEmpty()){
                 continue;
             }
-            Memory memory = new Memory();
             String description = item.getString("description");
             String body = item.getString("body");
             if (description == null || description.isBlank() || body == null || body.isBlank()) {

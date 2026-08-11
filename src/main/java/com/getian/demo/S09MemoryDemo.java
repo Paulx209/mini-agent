@@ -69,16 +69,16 @@ public class S09MemoryDemo {
             }
 
 
-            //MEMORY.md 是便宜索引，每轮都放进 system prompt；正文只在相关时注入用户消息。
+            //1.MEMORY.md 记忆索引内容 放进system prompt中
             config.setSystemPrompt(systemPrompt(memoryManager.systemMemoryIndex()));
 
-            //给当前的query 携带相关的记忆
+            //2.给当前的query 携带相关的记忆
             Message message = memoryManager.injectRelevantMemories(history, query);
             history.add(message);
 
-            //保留会话之前的上下文 防止被压缩掉
+            //3.保留会话之前的上下文 防止被压缩掉
             List<Message> preCompactSnapShot = agentLoop.snapshot(history);
-            //开始一次完整对话
+            //4.开始一次完整对话
             AssistantMessage resp = agentLoop.run(history, preCompactSnapShot);
             for(ContentBlock block :resp.getContent()){
                 if(block instanceof TextBlock){

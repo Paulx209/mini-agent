@@ -124,9 +124,11 @@ public class TodoWriteTool implements Tool {
         }
         Object todos = input.get("todos");
         if (todos instanceof JSONArray) {
+            //如果是数组类型
             return (JSONArray) todos;
         } else if (todos instanceof String) {
             try {
+                //json字符串
                 return JSON.parseArray((String) todos);
             } catch (Exception e) {
                 return null;
