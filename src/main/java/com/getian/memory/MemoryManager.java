@@ -98,6 +98,9 @@ public class MemoryManager {
     }
 
 
+    /**
+     * 获取最近的 6条 Message , 最后再拼接userPrompt
+     */
     private String recentConversation(List<Message> history, String userText) {
         StringBuilder builder = new StringBuilder();
         int start = Math.max(0, history.size() - 6);
