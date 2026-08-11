@@ -186,7 +186,7 @@ public class MemoryStore {
             }
             body = contextArr[2];
         }
-        return new Memory(filename, name, description, type, body);
+        return new Memory(filename, name, description, body, type);
     }
 
 

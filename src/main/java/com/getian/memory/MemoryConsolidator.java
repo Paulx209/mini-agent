@@ -60,8 +60,9 @@ public class MemoryConsolidator {
             memoryStore.write(new Memory(null,
                     item.getString("name"),
                     description,
-                    item.getString("type"),
-                    body));
+                    body,
+                    item.getString("type")
+                    ));
         }
     }
 

@@ -156,7 +156,7 @@ public class MemoryExtractor {
             if (description == null || description.isBlank() || body == null || body.isBlank()) {
                 continue;
             }
-            Memory memory = new Memory(null,name,description,type,body);
+            Memory memory = new Memory(null,name,description,body,type);
             memoryList.add(memory);
         }
         return memoryList;
