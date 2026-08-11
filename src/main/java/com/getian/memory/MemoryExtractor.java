@@ -108,8 +108,8 @@ public class MemoryExtractor {
         memories.add(new Memory(null,
                 "user-remember-" + System.currentTimeMillis(),
                 remembered,
-                "user",
-                remembered));
+                remembered,
+                "user"));
         return memories;
     }
 
