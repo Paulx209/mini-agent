@@ -157,12 +157,12 @@ public class CronScheduler {
                     ? cronJob.getPrompt().substring(0, 40) : cronJob.getPrompt()));
             try {
                 onFire.accept(cronJob);
+                //一次性任务 执行完取消掉
+                if (!cronJob.isRecurring()) {
+                    cancel(cronJob.getId());
+                }
             } catch (Exception e) {
                 System.err.println("  [cron error] " + cronJob.getId() + ": " + e.getMessage());
-            }
-            //一次性任务 执行完取消掉
-            if (!cronJob.isRecurring()) {
-                cancel(cronJob.getId());
             }
         }
     }
