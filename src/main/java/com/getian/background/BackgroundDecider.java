@@ -3,8 +3,6 @@ package com.getian.background;
 import com.alibaba.fastjson.JSONObject;
 
 import java.util.Arrays;
-import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  *@Author: sonicge
@@ -23,7 +21,8 @@ public class BackgroundDecider {
         if (toolName != null && !toolName.isBlank() && !"bash".equals(toolName)){
             return false;
         }
-        if(inputSchema !=null && inputSchema.getBoolean("run_in_background") !=null && inputSchema.getBoolean("run_in_background")){
+        //如果是bash的话，需要判断run_in_background(非必需)
+        if(inputSchema !=null && inputSchema.getBoolean("run_in_background") != null && inputSchema.getBoolean("run_in_background")){
             return true;
         }
         //第二层，兜底逻辑
@@ -38,7 +37,7 @@ public class BackgroundDecider {
         if(command == null || command.isBlank()){
             return false;
         }
-        List<String> list = Arrays.stream(SLOW_KEYWORDS).collect(Collectors.toList());
-        return list.contains(command);
+        return Arrays.stream(SLOW_KEYWORDS)
+                .anyMatch(keyword -> command.toLowerCase().contains(keyword));
     }
 }
