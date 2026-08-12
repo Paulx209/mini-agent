@@ -16,6 +16,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * @Author: sonicge
@@ -24,6 +25,7 @@ import java.util.Scanner;
  */
 
 public class S12CronSchedulerDemo {
+    static AtomicReference<CronScheduler> schedulerRef = new AtomicReference<>();
     private static final String SYSTEM_PROMPT = "You are a coding agent. Act, don't explain.\n\n"
             + "Available tools: bash, read_file, write_file, "
             + "create_task, list_tasks, get_task, claim_task, complete_task, "
@@ -51,12 +53,16 @@ public class S12CronSchedulerDemo {
         Object agentLock = new Object();
         CronScheduler scheduler = new CronScheduler(new CronStore(workDir), job -> {
             synchronized (agentLock) {
-                System.out.println("  [cron inject] " + job.getPrompt());
-                history.add(Message.user(job.getPrompt()));
-                AssistantMessage answer = agentLoop.run(history);
-                printText(answer);
+                CronScheduler preScheduler = schedulerRef.get();
+                if (preScheduler.isValid(job)) {
+                    System.out.println("  [cron inject] " + job.getPrompt());
+                    history.add(Message.user(job.getPrompt()));
+                    AssistantMessage answer = agentLoop.run(history);
+                    printText(answer);
+                }
             }
         });
+        schedulerRef.set(scheduler);
 
         registry.registry(new SchedulerCronTool(scheduler))
                 .registry(new ListCronsTool(scheduler))

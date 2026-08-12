@@ -111,6 +111,10 @@ public class CronScheduler {
         return new ArrayList<>(jobs.values());
     }
 
+    public boolean isValid(CronJob job) {
+        return job != null && jobs.get(job.getId()) == job;
+    }
+
 
     private String validateCron(String cron) {
         //1.是否为空
