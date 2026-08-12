@@ -3,6 +3,7 @@ package com.getian.team;
 import com.alibaba.fastjson.JSONObject;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
  *@Author: sonicge
@@ -11,6 +12,7 @@ import lombok.Data;
 
 @Data
 @AllArgsConstructor
+@NoArgsConstructor
 public class TeamMessage {
     private String from; //发送者
     private String to; //接收者
