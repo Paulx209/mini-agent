@@ -4,6 +4,7 @@ import cn.hutool.cron.CronUtil;
 import cn.hutool.cron.pattern.CronPattern;
 import cn.hutool.cron.task.Task;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -85,7 +86,13 @@ public class CronScheduler {
 
         //4.持久化 -> 同步到文件
         if (durable) {
-            cronStore.save(new ArrayList<>(jobs.values()));
+            try {
+                cronStore.save(new ArrayList<>(jobs.values()));
+            } catch (IOException e) {
+                jobs.remove(id);
+                CronUtil.remove(id);
+                return "Error: failed to persist cron job " + id + ": " + e.getMessage();
+            }
         }
 
         System.out.println("  [cron register] " + id + " '" + cron + "' → "
@@ -101,7 +108,13 @@ public class CronScheduler {
         CronUtil.remove(jobId);
         //删除需要持久化的job 需要重新写文件
         if (removed.isDurable()) {
-            cronStore.save(new ArrayList<>(jobs.values()));
+            try {
+                cronStore.save(new ArrayList<>(jobs.values()));
+            } catch (IOException e) {
+                jobs.put(jobId,removed);
+                CronUtil.schedule(jobId,removed.getCron(),new CronTask(removed));
+                return "Cancelled Error : " + e.getMessage();
+            }
         }
         System.out.println("  [cron cancel] " + jobId);
         return "Cancelled " + jobId;

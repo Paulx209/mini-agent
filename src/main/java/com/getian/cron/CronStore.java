@@ -27,14 +27,12 @@ public class CronStore {
     /**
      * 将cronJobs集合写到file文件中
      */
-    public void save(List<CronJob> cronJobs) {
+    public void save(List<CronJob> cronJobs) throws IOException {
         List<CronJob> durable = cronJobs.stream().filter(CronJob::isDurable).collect(Collectors.toList());
-        try {
-            String jsonString = JSON.toJSONString(durable, true);
-            Files.writeString(file.toPath(), jsonString, StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            System.err.println("  [cron] failed to save durable jobs: " + e.getMessage());
-        }
+
+        String jsonString = JSON.toJSONString(durable, true);
+        Files.writeString(file.toPath(), jsonString, StandardCharsets.UTF_8);
+
     }
 
     /**
