@@ -1,7 +1,6 @@
 package com.getian.demo;
 
 
-import com.alibaba.fastjson.JSONObject;
 import com.getian.background.BackgroundTasks;
 import com.getian.core.*;
 import com.getian.cron.CronScheduler;
@@ -25,7 +24,6 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 
 public class S12CronSchedulerDemo {
-    static AtomicReference<CronScheduler> schedulerRef = new AtomicReference<>();
     private static final String SYSTEM_PROMPT = "You are a coding agent. Act, don't explain.\n\n"
             + "Available tools: bash, read_file, write_file, "
             + "create_task, list_tasks, get_task, claim_task, complete_task, "
@@ -35,6 +33,7 @@ public class S12CronSchedulerDemo {
             + "Working directory: " + System.getProperty("user.dir");
 
     public static void main(String[] args) {
+        AtomicReference<CronScheduler> schedulerRef = new AtomicReference<>();
         File workDir = new File(".");
         TaskService taskService = new TaskService(new TaskStore(workDir));
         BackgroundTasks manager = new BackgroundTasks();
@@ -54,7 +53,7 @@ public class S12CronSchedulerDemo {
         CronScheduler scheduler = new CronScheduler(new CronStore(workDir), job -> {
             synchronized (agentLock) {
                 CronScheduler preScheduler = schedulerRef.get();
-                if (preScheduler.isValid(job)) {
+                if (preScheduler!=null && preScheduler.isValid(job)) {
                     System.out.println("  [cron inject] " + job.getPrompt());
                     history.add(Message.user(job.getPrompt()));
                     AssistantMessage answer = agentLoop.run(history);
