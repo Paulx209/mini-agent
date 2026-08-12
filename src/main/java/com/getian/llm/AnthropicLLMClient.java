@@ -33,11 +33,20 @@ public class AnthropicLLMClient implements LLMClient {
         for (Map.Entry<String, String> entry : headersMap.entrySet()) {
             request.header(entry.getKey(), entry.getValue());
         }
+        RuntimeException lastException = null;
         //4.执行
-        HttpResponse response = request.execute();
-
-        //5.解析response
-        return parseResponse(response.body());
+        int maxRetries = 5;
+        for (int i = 0; i < maxRetries; i++) {
+            try {
+                HttpResponse response = request.execute();
+                return parseResponse(response.body());
+            } catch (Exception e) {
+                lastException = new RuntimeException(e);
+                System.err.println("[llm retry] attempt " + (i+1) + "/" + maxRetries
+                        + " failed: " + e.getMessage());
+            }
+        }
+        throw new RuntimeException("LLM request failed after " + maxRetries + " attempts", lastException);
     }
 
     public AssistantMessage parseResponse(String responseBody) {
