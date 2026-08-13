@@ -28,9 +28,10 @@ public class S14TeamProtocolsDemo {
             + "Available tools: bash, read_file, write_file, "
             + "get_task, create_task, list_tasks, claim_task, complete_task, "
             + "spawn_teammate, send_message, check_inbox, "
-            + "request_shutdown, request_plan, review_plan.\n\n"
+            + "request_shutdown, request_plan, review_plan, review_turn_extension.\n\n"
             + "Working directory: " + System.getProperty("user.dir");
 
+    //SpawnTeammateTool 在派生subAgent的时候会分配对应的name role userPrompt
     private static final String TEAMMATE_SYSTEM_PROMPT_TEMPLATE =
             "You are '%s', a %s. Use tools to complete tasks. "
                     + "Check inbox for protocol messages (shutdown_request, etc).\n\n"
@@ -38,10 +39,7 @@ public class S14TeamProtocolsDemo {
 
     public static void main(String[] args) {
         File workdir = new File(".");
-        TaskService taskService = new TaskService(new TaskStore(workdir));
         BackgroundTasks backgroundTasks = new BackgroundTasks();
-        MessageBus bus = new MessageBus(workdir);
-        ProtocolService protocol = new ProtocolService(bus);
 
         AnthropicConfig config = AnthropicClientUtils.defaultAnthropicConfig(LEAD_SYSTEM_PROMPT);
         AnthropicLLMClient mainClient = new AnthropicLLMClient(config);
@@ -49,6 +47,7 @@ public class S14TeamProtocolsDemo {
         ToolRegistry registry = AnthropicClientUtils.createSimpleToolRegistry(workdir);
 
         //注册 subtask 相关
+        TaskService taskService = new TaskService(new TaskStore(workdir));
         registry.registry(new CreateTaskTool(taskService))
                 .registry(new GetTaskTool(taskService))
                 .registry(new CompleteTaskTool(taskService))
@@ -56,11 +55,14 @@ public class S14TeamProtocolsDemo {
                 .registry(new ClaimTaskTool(taskService));
 
         //注册 主子agent通信 相关
+        MessageBus bus = new MessageBus(workdir);
+        ProtocolService protocol = new ProtocolService(bus);
         SpawnTeammateTool spawnTeammateTool = new SpawnTeammateTool(workdir, bus, config.getBaseUrl(), config.getApiKey(), config.getModel(), TEAMMATE_SYSTEM_PROMPT_TEMPLATE, protocol);
         registry.registry(new SendMessageTool(bus, "lead"))
                 .registry(new RequestPlanTool(protocol))
                 .registry(new RequestShutdownTool(protocol))
                 .registry(new ReviewPlanTool(protocol))
+                .registry(new ReviewTurnExtensionTool(protocol))
                 .registry(new ProtocolCheckInboxTool(protocol, bus))
                 .registry(spawnTeammateTool);
 

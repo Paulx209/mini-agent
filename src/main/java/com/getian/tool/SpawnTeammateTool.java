@@ -24,7 +24,9 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 
 public class SpawnTeammateTool implements Tool {
-    private static final int MAX_TEAMMATE_TURNS = 10;
+    private static final int INITIAL_MAX_TURNS = 10;
+    private static final int AUTO_EXTENDED_MAX_TURNS = 20;
+    private static final int MAX_EXTENSION_REQUESTS = 2;
     private static final long IDLE_TIMEOUT_TIME = 60000; // 60s
     private static final long IDLE_SLEEP_TIME = 5000; // 5s
     private final int INBOX_NONE = 0;
@@ -40,6 +42,7 @@ public class SpawnTeammateTool implements Tool {
     private final ProtocolService protocolService;
     private final TaskService taskService;
     private final Set<String> activeTeammates = ConcurrentHashMap.newKeySet();
+    private final ConcurrentHashMap<String, Integer> approvedTurnExtensions = new ConcurrentHashMap<>();
 
     public SpawnTeammateTool(File workdir, MessageBus messageBus, String baseUrl, String apiKey, String model, String promptTemplate) {
         this(workdir, messageBus, baseUrl, apiKey, model, promptTemplate, null);
@@ -171,7 +174,7 @@ public class SpawnTeammateTool implements Tool {
         List<Message> history = new ArrayList<>();
         history.add(Message.user(prompt));
         AssistantMessage lastResponse = null;
-        for (int i = 0; i < MAX_TEAMMATE_TURNS; i++) {
+        for (int i = 0; i < INITIAL_MAX_TURNS; i++) {
             //注入其他agent给该agent发送的message
             injectTeammateInbox(name, history);
 
@@ -194,9 +197,12 @@ public class SpawnTeammateTool implements Tool {
         List<Message> history = new ArrayList<>();
         history.add(Message.user(prompt));
         AssistantMessage lastResp = null;
+        int allowedTurns = INITIAL_MAX_TURNS;
+        int extensionRequests = 0;
+        boolean autoExtended = false;
         while(true){
             boolean reachMaxTurns = true;
-            for (int i = 0; i < MAX_TEAMMATE_TURNS; i++) {
+            for (int i = 0; i < allowedTurns; i++) {
                 //inject最新的mailBox
                 int shouldAction = injectTeammateInbox(name, history);
                 if (shouldAction == INBOX_SHUTDOWN) {
@@ -217,6 +223,9 @@ public class SpawnTeammateTool implements Tool {
                         return lastResp;
                     }
                     reachMaxTurns = false;
+                    allowedTurns = INITIAL_MAX_TURNS;
+                    extensionRequests = 0;
+                    autoExtended = false;
                     //新一轮agentLoop开始
                     break;
                 }
@@ -224,10 +233,43 @@ public class SpawnTeammateTool implements Tool {
             }
             //进入idle
             if(reachMaxTurns){
-                int idleAction = idleDo(name, history);
-                if(idleAction == INBOX_SHUTDOWN || idleAction == INBOX_TIMEOUT){
+                //自动扩大maxTurns
+                if (!autoExtended) {
+                    autoExtended = true;
+                    allowedTurns = AUTO_EXTENDED_MAX_TURNS;
+                    history.add(Message.user("[Turn limit automatically extended] "
+                            + "Continue the current task. New limit: " + allowedTurns));
+                    continue;
+                }
+                if (extensionRequests >= MAX_EXTENSION_REQUESTS) {
+                    messageBus.send(name, "lead",
+                            "Task blocked after all turn extensions were used.", "result");
                     return lastResp;
                 }
+                //还未执行完毕 向mainAgent申请继续扩大
+                protocolService.requestTurnExtension(name, "", extractText(lastResp),
+                        "The current task is not complete.",
+                        "The turn limit was reached while tool work remains.");
+                extensionRequests++;
+                int additionalTurns = waitForTurnExtension(name, history);
+                if (additionalTurns <= 0) {
+                    return lastResp;
+                }
+                allowedTurns = additionalTurns;
+            }
+        }
+    }
+
+    private int waitForTurnExtension(String name, List<Message> history) {
+        while (true) {
+            sleep(IDLE_SLEEP_TIME);
+            int inboxAction = injectTeammateInbox(name, history);
+            if (inboxAction == INBOX_SHUTDOWN) {
+                return -1;
+            }
+            Integer approvedTurns = approvedTurnExtensions.remove(name);
+            if (approvedTurns != null) {
+                return approvedTurns;
             }
         }
     }
@@ -328,6 +370,20 @@ public class SpawnTeammateTool implements Tool {
         List<TeamMessage> normalMessages = new ArrayList<>();
         boolean shouldContinue = false;
         for (TeamMessage message : inbox) {
+            if ("turn_extension_response".equals(message.getType())) {
+                JSONObject metadata = message.getMetadata();
+                boolean approved = metadata != null && metadata.getBooleanValue("approve");
+                if (!approved) {
+                    messages.add(Message.user("[Turn extension rejected] " + message.getContent()));
+                    return INBOX_SHUTDOWN;
+                }
+                int additionalTurns = Math.max(1, metadata.getIntValue("additional_turns"));
+                approvedTurnExtensions.put(name, additionalTurns);
+                messages.add(Message.user("[Turn extension approved] Continue the current task. "
+                        + "Additional turns: " + additionalTurns));
+                shouldContinue = true;
+                continue;
+            }
             if (protocolService != null && protocolService.isTeammateProtocolMessage(message)) {
                 //协议消息
                 boolean shouldStop = protocolService.handleTeammateProtocolMessage(name, message, messages);

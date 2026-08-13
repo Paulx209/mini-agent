@@ -16,8 +16,9 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 
 public class ProtocolService {
+    private static final int DEFAULT_EXTENSION_TURNS = 10;
     private final MessageBus bus;
-    private final AtomicInteger sequence = new AtomicInteger(0);
+    private final AtomicInteger sequence = new AtomicInteger(0); //用来构造 ProtocolState requestId属性的
     private final Map<String, ProtocolState> pendingRequests = new ConcurrentHashMap<>();
     private final String LEAD = "lead";
 
@@ -25,6 +26,9 @@ public class ProtocolService {
         this.bus = bus;
     }
 
+    /**
+     * MainAgent 指定某个subAgent 关机 | 创建ProtocolState 存map send消息
+     */
     public String requestShutdown(String teammate){
         String requestId = requestId();
         JSONObject metadata = metadata(requestId);
@@ -40,7 +44,7 @@ public class ProtocolService {
     /**
      * mainAgent -> subAgent 让subAgent创建Plan 不属于protocolState的范畴
      */
-    public String requestPlan(String teammate, String task) throws Exception {
+    public String requestPlan(String teammate, String task){
         bus.send(LEAD, teammate, "Please submit a plan for: " + task, "message");
         return "Asked " + teammate + " to submit a plan";
     }
@@ -80,6 +84,55 @@ public class ProtocolService {
         return "Plan " + (approve ? "approved" : "rejected") + " (" + requestId + ")";
     }
 
+    public String requestTurnExtension(String agentName, String taskId,
+                                       String progress, String remainingWork,
+                                       String reason) {
+        String requestId = requestId();
+        JSONObject requestMetadata = metadata(requestId)
+                .fluentPut("task_id", emptyIfNull(taskId))
+                .fluentPut("progress", emptyIfNull(progress))
+                .fluentPut("remaining_work", emptyIfNull(remainingWork))
+                .fluentPut("reason", emptyIfNull(reason))
+                .fluentPut("requested_turns", DEFAULT_EXTENSION_TURNS);
+        pendingRequests.put(requestId, new ProtocolState(
+                requestId, "turn_extension", agentName, LEAD, "pending",
+                emptyIfNull(remainingWork), System.currentTimeMillis()));
+        bus.send(agentName, LEAD,
+                "Turn limit reached. Requesting additional turns.",
+                "turn_extension_request", requestMetadata);
+        return requestId;
+    }
+
+    public String reviewTurnExtension(String requestId, boolean approve,
+                                      int additionalTurns, String feedback) {
+        ProtocolState state = pendingRequests.get(requestId);
+        if (state == null) {
+            return "Request " + requestId + " not found";
+        }
+        if (!"turn_extension".equals(state.getType())) {
+            return "Request " + requestId + " is not a turn extension request";
+        }
+        if (!"pending".equals(state.getStatus())) {
+            return "Request " + requestId + " already " + state.getStatus();
+        }
+        state.setStatus(approve ? "approved" : "rejected");
+        int grantedTurns = approve ? Math.max(1, additionalTurns) : 0;
+        JSONObject responseMetadata = metadata(requestId)
+                .fluentPut("approve", approve)
+                .fluentPut("additional_turns", grantedTurns);
+        String content = feedback == null || feedback.isBlank()
+                ? (approve ? "Additional turns approved." : "Additional turns rejected.")
+                : feedback;
+        bus.send(LEAD, state.getSender(), content,
+                "turn_extension_response", responseMetadata);
+        return approve
+                ? "Approved " + grantedTurns + " additional turns (" + requestId + ")"
+                : "Turn extension rejected (" + requestId + ")";
+    }
+
+    /**
+     * mainAgent 消费 mailbox 中的消息
+     */
     public List<TeamMessage> consumeLeadInBox() {
         List<TeamMessage> teamMessages = bus.read(LEAD);
         for (TeamMessage message : teamMessages) {
@@ -89,6 +142,7 @@ public class ProtocolService {
             }
             String requestId = metadata.getString("request_id");
             String messageType = message.getType();
+            // 只有 shutdown_response 的messageType需要处理 state#status属性
             if (requestId != null && messageType != null && messageType.endsWith("_response")) {
                 matchResponse(requestId, messageType, metadata.getBooleanValue("approve"));
             }
@@ -97,6 +151,7 @@ public class ProtocolService {
     }
 
     /**
+     * 处理当前requestId 对应的 protocolState
      * 该方法目前只适用于处理：shutdown 事件的
      */
     private void matchResponse(String requestId, String messageType, boolean approve) {
@@ -106,21 +161,24 @@ public class ProtocolService {
             return;
         }
         String protocolType = state.getType();
-        if ("plan_approval".equals(protocolType) && !"plan_approval_response".equals(messageType)) {
-            System.out.println("  [protocol] type mismatch: expected plan_approval_response, got "
-                    + messageType);
-            return;
-        }
         if("shutdown".equals(protocolType) && !"shutdown_response".equals(messageType)){
             System.out.println("  [protocol] type mismatch: expected shutdown_response, got "
                     + messageType);
             return;
         }
+        // always false
+        if("plan_approval".equals(protocolType) && !"plan_approval_response".equals(messageType)){
+            System.out.println("  [protocol] type mismatch: expected shutdown_response, got "
+                    + messageType);
+            return;
+        }
+
         if(!"pending".equals(state.getStatus())){
             System.out.println("  [protocol] " + requestId + " already "
                     + state.getStatus() + ", ignoring duplicate");
             return;
         }
+
         state.setStatus(approve ? "approved" : "rejected");
         System.out.println("  [protocol] " + state.getType() + " "
                 + state.getStatus() + " (" + requestId + ")");
@@ -135,15 +193,36 @@ public class ProtocolService {
         return String.format("req_%06d", sequence.incrementAndGet());
     }
 
-    public boolean isProtocolMessage(TeamMessage message) {
-        String messageType = message.getType();
-        return "shutdown_request".equals(messageType) || "plan_approval_response".equals(messageType);
+    private String emptyIfNull(String value) {
+        return value == null ? "" : value;
     }
 
+    public boolean isTeammateProtocolMessage(TeamMessage message) {
+        String messageType = message.getType();
+        return "shutdown_request".equals(messageType)
+                || "plan_approval_response".equals(messageType)
+                || "turn_extension_response".equals(messageType);
+    }
+
+    public boolean isProtocolMessage(TeamMessage message){
+        String messageType = message.getType();
+        boolean teammateProtocolMessage = isTeammateProtocolMessage(message);
+        if(!teammateProtocolMessage){
+            return "shutdown_response".equals(messageType)
+                    || "plan_approval_request".equals(messageType)
+                    || "turn_extension_request".equals(messageType);
+        }
+        return true;
+    }
+
+    /**
+     * 处理协议消息 : shutdown_request  / plan_approval_response
+     */
     public boolean handleTeammateProtocolMessage(String name, TeamMessage message, List<Message> messages) {
         String type = message.getType();
         JSONObject metadata = message.getMetadata();
         String requestId = metadata == null ? "" : metadata.getString("request_id");
+        //准备shutdown
         if("shutdown_request".equals(type)){
             JSONObject responseMeta = metadata(requestId);
             responseMeta.fluentPut("approve",true);
