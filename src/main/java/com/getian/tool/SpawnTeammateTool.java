@@ -127,7 +127,10 @@ public class SpawnTeammateTool implements Tool {
         return new ToolResult("Teammate '" + agentName + "' spawned as " + agentRole.trim());
     }
 
-    private void runTeammate(String agentName, String agentRole, String agentPrompt) throws Exception {
+    /**
+     * subAgent启动
+     */
+    private void runTeammate(String agentName, String agentRole, String agentPrompt) {
         try {
             ToolRegistry registry = new ToolRegistry()
                     .registry(new BashTool(workdir))
@@ -161,6 +164,9 @@ public class SpawnTeammateTool implements Tool {
         }
     }
 
+    /**
+     * 普通模式 agentLoop
+     */
     private AssistantMessage runSimpleTurnLoop(String name, String prompt, LLMClient llmClient, ToolRegistry registry) {
         List<Message> history = new ArrayList<>();
         history.add(Message.user(prompt));
@@ -181,6 +187,9 @@ public class SpawnTeammateTool implements Tool {
         return lastResponse;
     }
 
+    /**
+     * 协议模式 agentLoop  当llm返回end_turn之后，不是直接返回，而是继续等待mailBox中的消息
+     */
     private AssistantMessage runProtocolLoop(String name, String prompt, LLMClient client, ToolRegistry toolRegistry) {
         List<Message> history = new ArrayList<>();
         history.add(Message.user(prompt));
@@ -308,6 +317,7 @@ public class SpawnTeammateTool implements Tool {
 
 
     private int injectTeammateInbox(String name, List<Message> messages) {
+        //从 .mailboxes/name.jsonl中读取消息 读取完就delete掉
         List<TeamMessage> inbox = messageBus.read(name);
         if (inbox.isEmpty()) {
             return INBOX_NONE;
@@ -316,19 +326,27 @@ public class SpawnTeammateTool implements Tool {
                 + inbox.size() + " message(s)");
 
         List<TeamMessage> normalMessages = new ArrayList<>();
+        boolean shouldContinue = false;
         for (TeamMessage message : inbox) {
-            if (protocolService != null && protocolService.isProtocolMessage(message)) {
+            if (protocolService != null && protocolService.isTeammateProtocolMessage(message)) {
+                //协议消息
                 boolean shouldStop = protocolService.handleTeammateProtocolMessage(name, message, messages);
                 if (shouldStop) {
                     return INBOX_SHUTDOWN;
+                }else{
+                    shouldContinue = true;
                 }
             } else {
+                //普通消息
                 normalMessages.add(message);
             }
         }
         if (!normalMessages.isEmpty()) {
             messages.add(Message.user("<inbox>\n"
                     + messageBus.formatInbox(normalMessages) + "\n</inbox>"));
+            return INBOX_CONTINUE;
+        }
+        if(shouldContinue){
             return INBOX_CONTINUE;
         }
         return INBOX_NONE;
