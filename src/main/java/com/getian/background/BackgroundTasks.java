@@ -40,6 +40,7 @@ public class BackgroundTasks {
     public String start(ToolUseBlock block, ToolRegistry toolRegistry) {
         int index = counter.incrementAndGet();
         String bgId = String.format("bgId_%04d", index);
+        //只处理 bash command
         String command = block.getInput() != null ? block.getInput().getString("command") : block.getName();
         if (command != null && command.length() > 80) {
             command = command.substring(0, 80);
@@ -64,16 +65,22 @@ public class BackgroundTasks {
         return bgId;
     }
 
+    /**
+     * 收集所有的执行完毕（success or error） 的后台任务
+     */
     public List<String> collectionNotifications() {
         List<String> notifications = new ArrayList<>();
         List<String> bgIds = new ArrayList<>();
+        //1.标记 Timeout task
         markTimeoutTasks();
         for (Map.Entry<String, BackgroundTask> entry : tasks.entrySet()) {
             BackgroundTask task = entry.getValue();
+            //2.收集所有执行完毕的taskId
             if (!RUNNING.equals(task.getStatus())) {
                 bgIds.add(entry.getKey());
             }
         }
+        //3.开始遍历
         for (String bgId : bgIds) {
             BackgroundTask task = tasks.remove(bgId);
             if (task == null) {
@@ -116,6 +123,7 @@ public class BackgroundTasks {
             }
             long now = System.currentTimeMillis();
             if(now - deadlinesMap.get(taskId) > waitTime){
+                //只是对状态进行修改 目前并没有杀掉线程
                 task.setStatus(TIMEOUT);
                 String content =  "Timed out after " + (now - deadlinesMap.get(taskId)) + " ms.";
                 results.put(taskId,content);
@@ -123,7 +131,6 @@ public class BackgroundTasks {
         }
     }
 
-    //todo 缺少对时间的判断 timeout超时
     private void executeInBackground(String bgId, ToolUseBlock block, ToolRegistry toolRegistry) {
         try {
             //记录命令开始执行时间

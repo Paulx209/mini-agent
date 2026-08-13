@@ -32,7 +32,7 @@ public class TaskService {
                 description,
                 PENDING,
                 null,
-                blockedBy
+                cleanBlockedBy(blockedBy)
         );
         taskStore.save(taskRecord);
         return taskRecord;
@@ -118,10 +118,16 @@ public class TaskService {
         return message;
     }
 
+    /**
+     * 扫描 现在所有未被认领的任务
+     */
     public List<TaskRecord> scanUnClaimedTask() {
         return taskStore.list().stream().filter(this::filterMethod).collect(Collectors.toList());
     }
 
+    /**
+     * 过滤出来所有未被认领的任务
+     */
     private boolean filterMethod(TaskRecord record) {
         return PENDING.equals(record.getStatus())
                 && blockingDependencies(record).isEmpty()
@@ -157,5 +163,11 @@ public class TaskService {
             }
         }
         return blockedTaskIds;
+    }
+
+    private List<String> cleanBlockedBy(List<String> blockedBy){
+        return blockedBy.stream().filter(s -> s != null && !s.isBlank())
+                .map(String::trim)
+                .collect(Collectors.toList());
     }
 }

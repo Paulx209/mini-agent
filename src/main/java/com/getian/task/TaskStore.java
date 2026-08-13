@@ -21,6 +21,9 @@ public class TaskStore {
         this.tasksDir = new File(workdir, ".tasks");
     }
 
+    /**
+     * 将Task任务写入文件中
+     */
     public TaskRecord save(TaskRecord task) {
         ensureTasksDir();
         if (task == null || task.getId() == null || task.getId().isBlank()) {
@@ -35,6 +38,9 @@ public class TaskStore {
         return task;
     }
 
+    /**
+     * 从文件中加载Task任务
+     */
     public TaskRecord loadByTaskId(String taskId) {
         ensureTasksDir();
         File file = taskFile(taskId);
@@ -49,12 +55,18 @@ public class TaskStore {
         }
     }
 
+    /**
+     * 判断task任务是否存在
+     */
     public boolean exists(String taskId) {
         ensureTasksDir();
         File file = new File(tasksDir, taskId + ".json");
         return !(!file.exists() || !file.isFile());
     }
 
+    /**
+     * 获取 .tasks/ 所有任务
+     */
     public List<TaskRecord> list() {
         List<TaskRecord> taskRecords = new ArrayList<>();
         ensureTasksDir();

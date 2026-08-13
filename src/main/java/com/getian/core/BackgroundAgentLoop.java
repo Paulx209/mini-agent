@@ -103,6 +103,9 @@ public class BackgroundAgentLoop {
         return tool.execute(toolUseBlock.getInput());
     }
 
+    /**
+     * 给消息上下文注入 后台任务执行结果
+     */
     private void injectBackgroundNotifications(List<Message> messageList) {
         List<String> notifications = manager.collectionNotifications();
         if (!notifications.isEmpty()) {
